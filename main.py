@@ -38,7 +38,7 @@ SECTORS = {
     "Машиностроение": ["IRKT", "ZILLP", "UWGN", "SVAV", "KMAZ", "UNAC"]
 }
 
-TICKERS_PER_PAGE = 5
+TICKERS_PER_PAGE = 10
 
 # Получение данных с MOEX
 
@@ -129,8 +129,6 @@ def plot_stock(df, ticker, levels=[], patterns=[]):
     plt.plot(df.index, df['EMA100'], label='EMA100', linestyle='--', alpha=0.7)  # EMA100
     plt.plot(df.index, df['EMA200'], label='EMA200', linestyle='--', alpha=0.7)  # EMA200
 
-    # Горизонтальные объемы
-  # plt.bar(df.index, df['VOLUME'], width=0.8, color='gray', alpha=0.3, label="Объем")
     
     for idx in df[df['Anomaly']].index:
         volume_ratio = df.loc[idx, 'Volume_Multiplier']
@@ -206,18 +204,15 @@ if Update and ContextTypes:
             rsi_series = df['RSI'].dropna()
             rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
             latest_date = df.index.max().strftime('%Y-%m-%d')
-            text_summary = f"\nПоследний RSI: {rsi_value}\nАктуальность данных: до {latest_date}\n"
+            
+            text_summary = f"\nПоследний RSI: {rsi_value}\n"
+            text_summary += f"Актуальность данных: до {latest_date}\n"
+            
             await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
             await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
 
-   #     if patterns:
-    #        text_summary += "\nОбнаружены паттерны:\n"
-     #       for p in patterns:
-      #          text_summary += f"- {p[0]} на {p[1].date()} по цене {p[2]:.2f}\n"
 
-
-
-async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def all(update, context):
     for ticker in sum(SECTORS.values(), []):
         try:
             df = get_moex_data(ticker)
