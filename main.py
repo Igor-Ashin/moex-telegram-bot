@@ -13,14 +13,32 @@ import asyncio
 
 # Заменяем telegram на условный заглушку или комментарий, чтобы избежать ошибки в окружении
 try:
-    from telegram import Update
-    from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 except ModuleNotFoundError:
-    print("Библиотека 'python-telegram-bot' не установлена. Убедитесь, что она есть в вашем окружении.")
+    print("Библиотека 'python-telegram-bot' не установлена.")
     Update = None
     ApplicationBuilder = None
     CommandHandler = None
+    CallbackQueryHandler = None
     ContextTypes = None
+
+SECTORS = {
+    "Финансы": ["T", "LEAS", "CARM", "ZAYM", "MBNK", "SBERP", "MOEX", "RENI", "BSPB", "SVCB", "VTBR", "SBER", "CBOM"],
+    "Нефтегаз": ["BANE", "TATN", "RNFT", "BANEP", "NVTK", "LKOH", "ROSN", "TATNP", "GAZP", "SNGS", "SNGSP"],
+    "Металлы и добыча": ["TRMK", "MTLRP", "AMEZ", "ROLO", "RUAL", "VSMO", "LNZL", "RASP", "ALRS", "GMKN", "SELG", "PLZL", "UGLD", "MTLR", "MAGN", "NLMK", "CHMF"],
+    "IT": ["CNRU", "YDEX", "DATA", "HEAD", "IVAT", "DELI", "WUSH", "POSI", "VKCO", "ASTR", "DIAS", "SOFL"],
+    "Телеком": ["NSVZ", "RTKMP", "VEON-RX", "TTLK", "MGTSP", "MTSS", "RTKM"],
+    "Строители": ["ETLN", "SMLT", "LSRG", "PIKK"],
+    "Ритейл": ["VSEH", "EUTR", "KROT", "ABRD", "GCHE", "AQUA", "HNFG", "FIXP", "BELU", "LENT", "OKEY", "OZON", "MVID", "MGNT"],
+    "Электро": ["HYDR", "DVEC", "TGKA", "TGKN", "TGKB", "LSNG", "MSNG", "ELFV", "IRAO", "UPRO", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES"],
+    "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
+    "Агро": ["KZOS", "NKNC", "UFOSP", "KAZT", "AKRN", "NKHP", "PHOR"],
+    "Медицина": ["OZPH", "PRMD", "GECO", "APTK", "LIFE", "ABIO", "GEMC"],
+    "Машиностроение": ["IRKT", "ZILLP", "UWGN", "SVAV", "KMAZ", "UNAC"]
+}
+
+TICKERS_PER_PAGE = 5
 
 # Получение данных с MOEX
 
@@ -150,44 +168,68 @@ def plot_stock(df, ticker, levels=[], patterns=[]):
 
 if Update and ContextTypes:
     async def a(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        ticker = context.args[0].upper() if context.args else "SBER"
-        df = get_moex_data(ticker)
-        df = analyze_indicators(df)
-        levels = find_levels(df)
-        patterns = detect_double_patterns(df)
-        chart = plot_stock(df, ticker, levels, patterns)
+        keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
+        await update.message.reply_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-        rsi_series = df['RSI'].dropna()
-        rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
-        latest_date = df.index.max().strftime('%Y-%m-%d')
-
-        text_summary = f"\nПоследний RSI: {rsi_value}\n"
-        text_summary += f"Актуальность данных: до {latest_date}\n"
+    async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        data = query.data
+        if data == "back_to_sectors":
+            keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
+            await query.edit_message_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
+        elif data.startswith("sector:"):
+            _, sector, page = data.split(":")
+            page = int(page)
+            tickers = SECTORS.get(sector, [])
+            start = page * TICKERS_PER_PAGE
+            end = start + TICKERS_PER_PAGE
+            visible = tickers[start:end]
+            keyboard = [[InlineKeyboardButton(t, callback_data=f"ticker:{t}")] for t in visible]
+            nav = []
+            if start > 0:
+                nav.append(InlineKeyboardButton("⬅️", callback_data=f"sector:{sector}:{page-1}"))
+            if end < len(tickers):
+                nav.append(InlineKeyboardButton("➡️", callback_data=f"sector:{sector}:{page+1}"))
+            if nav:
+                keyboard.append(nav)
+            keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="back_to_sectors")])
+            await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
+        elif data.startswith("ticker:"):
+            ticker = data.split(":", 1)[1]
+            await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ...")
+            df = get_moex_data(ticker)
+            df = analyze_indicators(df)
+            levels = find_levels(df)
+            patterns = detect_double_patterns(df)
+            chart = plot_stock(df, ticker, levels, patterns)
+            rsi_series = df['RSI'].dropna()
+            rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
+            latest_date = df.index.max().strftime('%Y-%m-%d')
+            text_summary = f"\nПоследний RSI: {rsi_value}\nАктуальность данных: до {latest_date}\n"
+            await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
+            await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
 
    #     if patterns:
     #        text_summary += "\nОбнаружены паттерны:\n"
      #       for p in patterns:
       #          text_summary += f"- {p[0]} на {p[1].date()} по цене {p[2]:.2f}\n"
 
-        await update.message.reply_photo(photo=open(chart, 'rb'))
-        await update.message.reply_text(text_summary)
 
-    async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        tickers = ["SBER", "GAZP", "LKOH", "GMKN", "ROSN", "TATN", "YDEX"]
-        for ticker in tickers:
+
+        async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        for ticker in sum(SECTORS.values(), []):
             try:
                 df = get_moex_data(ticker)
                 df = analyze_indicators(df)
                 levels = find_levels(df)
                 patterns = detect_double_patterns(df)
                 chart = plot_stock(df, ticker, levels, patterns)
-
                 rsi_series = df['RSI'].dropna()
                 rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
                 latest_date = df.index.max().strftime('%Y-%m-%d')
-
-                text_summary = f"\nПоследний RSI: {rsi_value}\n"
-                text_summary += f"Актуальность данных: до {latest_date}\n"
+                text_summary = f"\nПоследний RSI: {rsi_value}\nАктуальность данных: до {latest_date}\n"
+                
 
            #     if patterns:
             #        text_summary += "\nОбнаружены паттерны:\n"
@@ -243,6 +285,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("a", a))
         app.add_handler(CommandHandler("all", all))
+        app.add_handler(CallbackQueryHandler(handle_callback))
         print("✅ Бот запущен и поддерживается Flask-сервером.")
         app.run_polling()
 else:
