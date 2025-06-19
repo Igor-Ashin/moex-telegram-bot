@@ -212,38 +212,31 @@ if Update and ContextTypes:
             await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
 
 
-async def all(update, context):
-    for ticker in sum(SECTORS.values(), []):
-        try:
-            df = get_moex_data(ticker)
-            df = analyze_indicators(df)
-            levels = find_levels(df)
-            patterns = detect_double_patterns(df)
-            chart = plot_stock(df, ticker, levels, patterns)
-
-            rsi_series = df['RSI'].dropna()
-            rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
-            latest_date = df.index.max().strftime('%Y-%m-%d')
-
-            text_summary = f"\nПоследний RSI: {rsi_value}\n"
-            text_summary += f"Актуальность данных: до {latest_date}\n"
-
-            await update.message.reply_photo(photo=open(chart, 'rb'))
-            await update.message.reply_text(f"{ticker}\n{text_summary}")
-        except Exception as e:
-            await update.message.reply_text(f"Ошибка при анализе {ticker}: {e}")
-                
-
-    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+   async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
-            "Привет! Я это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
+            "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
             "Команды:\n"
-            "/a <тикер> — анализ одной акции (например: /a SBER)\n"
-            "/all — анализ всех голубых фишек Мосбиржи\n\n"
-            "Популярные тикеры:\n"
-            "SBER, GAZP, LKOH, GMKN, ROSN, TATN, YDEX"
+            "/a — выбрать акцию через кнопки\n"
+            "/all — анализ всех голубых фишек Мосбиржи\n"
         )
         await update.message.reply_text(text)
+
+    async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        for ticker in sum(SECTORS.values(), []):
+            try:
+                df = get_moex_data(ticker)
+                df = analyze_indicators(df)
+                levels = find_levels(df)
+                patterns = detect_double_patterns(df)
+                chart = plot_stock(df, ticker, levels, patterns)
+                rsi_series = df['RSI'].dropna()
+                rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
+                latest_date = df.index.max().strftime('%Y-%m-%d')
+                text_summary = f"\nПоследний RSI: {rsi_value}\nАктуальность данных: до {latest_date}\n"
+                await update.message.reply_photo(photo=open(chart, 'rb'))
+                await update.message.reply_text(f"{ticker}\n{text_summary}")
+            except Exception as e:
+                await update.message.reply_text(f"Ошибка при анализе {ticker}: {e}")
 
 
 
