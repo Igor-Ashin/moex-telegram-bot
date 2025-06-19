@@ -221,7 +221,7 @@ if Update and ContextTypes:
         )
         await update.message.reply_text(text)
 
-     async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for ticker in sum(SECTORS.values(), []):
             try:
                 df = get_moex_data(ticker)
