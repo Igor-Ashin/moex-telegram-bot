@@ -212,7 +212,7 @@ if Update and ContextTypes:
             await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
 
 
-   async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
             "Команды:\n"
@@ -221,7 +221,7 @@ if Update and ContextTypes:
         )
         await update.message.reply_text(text)
 
-    async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+     async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for ticker in sum(SECTORS.values(), []):
             try:
                 df = get_moex_data(ticker)
