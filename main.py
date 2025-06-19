@@ -24,18 +24,18 @@ except ModuleNotFoundError:
     ContextTypes = None
 
 SECTORS = {
-    "Финансы": ["T", "LEAS", "CARM", "ZAYM", "MBNK", "SBERP", "MOEX", "RENI", "BSPB", "SVCB", "VTBR", "SBER", "CBOM"],
-    "Нефтегаз": ["BANE", "TATN", "RNFT", "BANEP", "NVTK", "LKOH", "ROSN", "TATNP", "GAZP", "SNGS", "SNGSP"],
-    "Металлы и добыча": ["TRMK", "MTLRP", "AMEZ", "ROLO", "RUAL", "VSMO", "LNZL", "RASP", "ALRS", "GMKN", "SELG", "PLZL", "UGLD", "MTLR", "MAGN", "NLMK", "CHMF"],
-    "IT": ["CNRU", "YDEX", "DATA", "HEAD", "IVAT", "DELI", "WUSH", "POSI", "VKCO", "ASTR", "DIAS", "SOFL"],
-    "Телеком": ["NSVZ", "RTKMP", "VEON-RX", "TTLK", "MGTSP", "MTSS", "RTKM"],
+    "Финансы": ["SBER", "T", "VTBR",  "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS" "CARM", "ZAYM", "CBOM"],
+    "Нефтегаз": ["GAZP", "NVTK", "LKOH", "ROSN", "TATNP",  "TATN",  "SNGS", "SNGSP", "BANE",  "BANEP", "RNFT"],
+    "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP","MTLR",  "VSMO", "RASP",  "SELG", "PLZL", "UGLD"],
+    "IT": ["YDEX", "DATA", "HEAD", "POSI", "VKCO", "ASTR", "IVAT", "DELI", "WUSH",  "CNRU", "DIAS", "SOFL"],
+    "Телеком": ["MTSS", "RTKMP", "RTKM" ,"MGTSP"],
     "Строители": ["ETLN", "SMLT", "LSRG", "PIKK"],
-    "Ритейл": ["VSEH", "EUTR", "KROT", "ABRD", "GCHE", "AQUA", "HNFG", "FIXP", "BELU", "LENT", "OKEY", "OZON", "MVID", "MGNT"],
-    "Электро": ["HYDR", "DVEC", "TGKA", "TGKN", "TGKB", "LSNG", "MSNG", "ELFV", "IRAO", "UPRO", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES"],
+    "Ритейл": ["BELU", "LENT", "OZON", "MVID", "MGNT", "VSEH", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "FIXP"],
+    "Электро": ["IRAO", "UPRO", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "DVEC", "TGKA", "TGKN", "TGKB", "LSNG", "MSNG", "ELFV"],
     "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
-    "Агро": ["KZOS", "NKNC", "UFOSP", "KAZT", "AKRN", "NKHP", "PHOR"],
-    "Медицина": ["OZPH", "PRMD", "GECO", "APTK", "LIFE", "ABIO", "GEMC"],
-    "Машиностроение": ["IRKT", "ZILLP", "UWGN", "SVAV", "KMAZ", "UNAC"]
+    "Агро": ["PHOR", "RAGR", "KZOS", "NKNC", "UFOSP", "KAZT", "AKRN", "NKHP"],
+    "Медицина": ["MDMG", "OZPH", "PRMD", "GECO", "APTK", "LIFE", "ABIO", "GEMC"],
+    "Машиностроение": ["UWGN", "SVAV", "KMAZ", "UNAC", "IRKT", "ZILLP"]
 }
 
 TICKERS_PER_PAGE = 10
