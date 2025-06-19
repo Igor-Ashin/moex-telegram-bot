@@ -232,7 +232,7 @@ async def all(update, context):
             await update.message.reply_text(f"{ticker}\n{text_summary}")
         except Exception as e:
             await update.message.reply_text(f"Ошибка при анализе {ticker}: {e}")
-                continue
+                
 
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
