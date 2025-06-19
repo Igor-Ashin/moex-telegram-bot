@@ -149,7 +149,7 @@ def plot_stock(df, ticker, levels=[], patterns=[]):
 # Telegram команда
 
 if Update and ContextTypes:
-    async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def a(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ticker = context.args[0].upper() if context.args else "SBER"
         df = get_moex_data(ticker)
         df = analyze_indicators(df)
@@ -172,7 +172,7 @@ if Update and ContextTypes:
         await update.message.reply_photo(photo=open(chart, 'rb'))
         await update.message.reply_text(text_summary)
 
-    async def analyze_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tickers = ["SBER", "GAZP", "LKOH", "GMKN", "ROSN", "TATN", "YDEX"]
         for ticker in tickers:
             try:
@@ -202,10 +202,10 @@ if Update and ContextTypes:
 
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
-            "Привет! Я бот для анализа акций Мосбиржи.\n"
+            "Привет! Я это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
             "Команды:\n"
-            "/analyze <тикер> — анализ одной акции (например: /analyze SBER)\n"
-            "/analyze_all — анализ всех голубых фишек Мосбиржи\n\n"
+            "/a <тикер> — анализ одной акции (например: /a SBER)\n"
+            "/all — анализ всех голубых фишек Мосбиржи\n\n"
             "Популярные тикеры:\n"
             "SBER, GAZP, LKOH, GMKN, ROSN, TATN, YDEX"
         )
@@ -241,8 +241,8 @@ if ApplicationBuilder:
         keep_alive()  # ← запуск Flask
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("analyze", analyze))
-        app.add_handler(CommandHandler("analyze_all", analyze_all))
+        app.add_handler(CommandHandler("a", a))
+        app.add_handler(CommandHandler("all", all))
         print("✅ Бот запущен и поддерживается Flask-сервером.")
         app.run_polling()
 else:
