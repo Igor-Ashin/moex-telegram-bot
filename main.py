@@ -238,6 +238,7 @@ if Update and ContextTypes:
             "/a — выбрать акцию через кнопки\n"
             "/all — анализ всех голубых фишек Мосбиржи\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
+            "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
         )
         await update.message.reply_text(text)
 
@@ -247,7 +248,7 @@ if Update and ContextTypes:
 
     async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
-        await update.message.reply_text("Выберите отрасль для анализа по Вайнштейну:", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Начинаю анализ всех акций. Это может занять некоторое время...")
@@ -283,6 +284,76 @@ if Update and ContextTypes:
                     
             except Exception as e:
                 await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
+
+    def find_sma30_crossover(ticker, days=14):
+        """
+        Находит пересечение цены снизу вверх через SMA30 за последние дни
+        Возвращает дату пересечения или None
+        """
+        try:
+            df = get_moex_data(ticker, days=60)  # Берём больше данных для расчета SMA30
+            if df.empty or len(df) < 35:  # Нужно минимум 35 дней для SMA30 + проверка
+                return None
+            
+            # Вычисляем SMA30
+            df['SMA30'] = df['CLOSE'].rolling(window=30).mean()
+            
+            # Берём только последние days дней для поиска пересечений
+            recent_df = df.tail(days + 1)  # +1 для сравнения с предыдущим днём
+            
+            crossover_date = None
+            
+            # Ищем пересечение снизу вверх
+            for i in range(1, len(recent_df)):
+                prev_close = recent_df['CLOSE'].iloc[i-1]
+                curr_close = recent_df['CLOSE'].iloc[i]
+                prev_sma = recent_df['SMA30'].iloc[i-1]
+                curr_sma = recent_df['SMA30'].iloc[i]
+                
+                # Проверяем пересечение: вчера цена была ниже SMA30, сегодня выше
+                if (prev_close < prev_sma and curr_close > curr_sma):
+                    crossover_date = recent_df.index[i]
+                    break
+            
+            return crossover_date
+            
+        except Exception as e:
+            print(f"Ошибка при поиске пересечения SMA30 для {ticker}: {e}")
+            return None
+
+    async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
+        
+        crossovers = []
+        all_tickers = sum(SECTORS.values(), [])
+        
+        # Проверяем каждый тикер
+        for ticker in all_tickers:
+            try:
+                crossover_date = find_sma30_crossover(ticker, days=14)
+                if crossover_date:
+                    crossovers.append((ticker, crossover_date))
+            except Exception as e:
+                print(f"Ошибка при анализе {ticker}: {e}")
+                continue
+        
+        if not crossovers:
+            await update.message.reply_text("📊 За последние две недели не найдено акций с пересечением цены через SMA30 снизу вверх.")
+            return
+        
+        # Сортируем по дате (от самого свежего к самому старому)
+        crossovers.sort(key=lambda x: x[1], reverse=True)
+        
+        # Формируем результат
+        result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 2 недели:\n\n"
+        
+        for ticker, date in crossovers:
+            formatted_date = date.strftime('%d.%m.%Y')
+            result_text += f"{ticker} {formatted_date}\n"
+        
+        result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
+        
+        await update.message.reply_text(result_text)
 
     async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -371,11 +442,11 @@ if Update and ContextTypes:
 
             elif data == "stan_back":
                 keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
-                await query.edit_message_text("Выберите отрасль для анализа по Вайнштейну:", reply_markup=InlineKeyboardMarkup(keyboard))
+                await query.edit_message_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
 
             elif data.startswith("stan_ticker:"):
                 ticker = data.split(":", 1)[1]
-                await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ по Вайнштейну...")
+                await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ по Штейну...")
 
                 df = get_moex_weekly_data(ticker)
                 if df.empty:
@@ -428,6 +499,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("a", a))
         app.add_handler(CommandHandler("all", all))  # Используем функцию all
         app.add_handler(CommandHandler("stan", stan))
+        app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CallbackQueryHandler(handle_callback))
         print("✅ Бот запущен и поддерживается Flask-сервером.")
         app.run_polling()
