@@ -249,9 +249,8 @@ if Update and ContextTypes:
             rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
             latest_date = df.index.max().strftime('%Y-%m-%d')
 
-            text_summary = f"
-Последний RSI: {rsi_value}\n"
-Актуальность данных: {latest_date}\n"
+            text_summary = f"\nПоследний RSI: {rsi_value}\n"
+            text_summary += f"Актуальность данных: до {latest_date}\n"
 
             await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
             await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
