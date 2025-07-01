@@ -39,6 +39,91 @@ SECTORS = {
 }
 
 TICKERS_PER_PAGE = 10
+# Получение данных для Штейн
+def get_moex_weekly_data(ticker="SBER", weeks=100):
+    till = datetime.today().strftime('%Y-%m-%d')
+    from_date = (datetime.today() - pd.Timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
+    url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=7&from={from_date}&till={till}"
+    r = requests.get(url)
+    data = r.json()
+    candles = data['candles']['data']
+    columns = data['candles']['columns']
+    df = pd.DataFrame(candles, columns=columns)
+    df['begin'] = pd.to_datetime(df['begin'])
+    df.set_index('begin', inplace=True)
+    df = df.rename(columns={'close': 'CLOSE'})
+    df = df[['CLOSE']].dropna()
+    return df.tail(weeks)
+
+#построение графика штейн
+def plot_stan_chart(df, ticker):
+    df['SMA30'] = df['CLOSE'].rolling(window=30).mean()
+    df['Upper'] = df['SMA30'] + 2 * df['CLOSE'].rolling(window=30).std()
+    df['Lower'] = df['SMA30'] - 2 * df['CLOSE'].rolling(window=30).std()
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(df.index, df['CLOSE'], label='Цена', color='blue')
+    plt.plot(df.index, df['SMA30'], label='SMA 30', linewidth=2.5, color='black')
+    plt.plot(df.index, df['Upper'], label='BB верх', linestyle='--', color='gray')
+    plt.plot(df.index, df['Lower'], label='BB низ', linestyle='--', color='gray')
+
+    plt.title(f"stan: {ticker} на 1W timeframe")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    filename = f"{ticker}_stan.png"
+    plt.savefig(filename)
+    plt.close()
+    return filename
+
+
+if Update and ContextTypes:
+    async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
+        await update.message.reply_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        data = query.data
+
+        if data.startswith("stan_sector:"):
+            _, sector, page = data.split(":")
+            page = int(page)
+            tickers = SECTORS.get(sector, [])
+            start = page * TICKERS_PER_PAGE
+            end = start + TICKERS_PER_PAGE
+            visible = tickers[start:end]
+
+            keyboard = [[InlineKeyboardButton(t, callback_data=f"stan_ticker:{t}")] for t in visible]
+            nav = []
+            if start > 0:
+                nav.append(InlineKeyboardButton("⬅️", callback_data=f"stan_sector:{sector}:{page-1}"))
+            if end < len(tickers):
+                nav.append(InlineKeyboardButton("➡️", callback_data=f"stan_sector:{sector}:{page+1}"))
+            if nav:
+                keyboard.append(nav)
+            keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="stan_back")])
+
+            await query.edit_message_text(
+                f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:",
+                reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data == "stan_back":
+            keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
+            await query.edit_message_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data.startswith("stan_ticker:"):
+            ticker = data.split(":", 1)[1]
+            await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ по Штейну...")
+
+            df = get_moex_weekly_data(ticker)
+            chart = plot_stan_chart(df, ticker)
+
+            latest_date = df.index.max().strftime('%Y-%m-%d')
+            await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
+            await context.bot.send_message(chat_id=query.message.chat.id, text=f"График построен по данным до {latest_date}")
+
 
 # Получение данных с MOEX
 
@@ -218,6 +303,7 @@ if Update and ContextTypes:
             "Команды:\n"
             "/a — выбрать акцию через кнопки\n"
             "/all — анализ всех голубых фишек Мосбиржи\n"
+            "/stan — анализ акции по методу Стэна Вайнштейна\n"
         )
         await update.message.reply_text(text)
 
@@ -270,6 +356,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("a", a))
         app.add_handler(CommandHandler("all", all))
+        app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CallbackQueryHandler(handle_callback))
         print("✅ Бот запущен и поддерживается Flask-сервером.")
         app.run_polling()
