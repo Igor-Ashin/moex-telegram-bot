@@ -77,7 +77,7 @@ def plot_stan_chart(df, ticker):
         plt.plot(df.index, df['Upper'], label='BB верх', linestyle='--', color='gray')
         plt.plot(df.index, df['Lower'], label='BB низ', linestyle='--', color='gray')
 
-        plt.title(f"stan: {ticker} на 1W timeframe")
+        plt.title(f"Вайнштейн: {ticker} на 1W ТФ")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
@@ -236,7 +236,7 @@ if Update and ContextTypes:
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
             "Команды:\n"
             "/a — выбрать акцию через кнопки\n"
-            "/all — анализ всех голубых фишек Мосбиржи\n"
+            "/all — анализ голубых фишек Мосбиржи\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
         )
@@ -285,7 +285,7 @@ if Update and ContextTypes:
             except Exception as e:
                 await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
 
-    def find_sma30_crossover(ticker, days=14):
+    def find_sma30_crossover(ticker, days=7):
         """
         Находит пересечение цены снизу вверх через SMA30 за последние дни
         Возвращает дату пересечения или None
@@ -330,7 +330,7 @@ if Update and ContextTypes:
         # Проверяем каждый тикер
         for ticker in all_tickers:
             try:
-                crossover_date = find_sma30_crossover(ticker, days=14)
+                crossover_date = find_sma30_crossover(ticker, days=7)
                 if crossover_date:
                     crossovers.append((ticker, crossover_date))
             except Exception as e:
