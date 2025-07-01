@@ -77,54 +77,6 @@ def plot_stan_chart(df, ticker):
     return filename
 
 
-if Update and ContextTypes:
-    async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
-        await update.message.reply_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.callback_query
-        await query.answer()
-        data = query.data
-
-        if data.startswith("stan_sector:"):
-            _, sector, page = data.split(":")
-            page = int(page)
-            tickers = SECTORS.get(sector, [])
-            start = page * TICKERS_PER_PAGE
-            end = start + TICKERS_PER_PAGE
-            visible = tickers[start:end]
-
-            keyboard = [[InlineKeyboardButton(t, callback_data=f"stan_ticker:{t}")] for t in visible]
-            nav = []
-            if start > 0:
-                nav.append(InlineKeyboardButton("⬅️", callback_data=f"stan_sector:{sector}:{page-1}"))
-            if end < len(tickers):
-                nav.append(InlineKeyboardButton("➡️", callback_data=f"stan_sector:{sector}:{page+1}"))
-            if nav:
-                keyboard.append(nav)
-            keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="stan_back")])
-
-            await query.edit_message_text(
-                f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:",
-                reply_markup=InlineKeyboardMarkup(keyboard))
-
-        elif data == "stan_back":
-            keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
-            await query.edit_message_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-        elif data.startswith("stan_ticker:"):
-            ticker = data.split(":", 1)[1]
-            await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ по Штейну...")
-
-            df = get_moex_weekly_data(ticker)
-            chart = plot_stan_chart(df, ticker)
-
-            latest_date = df.index.max().strftime('%Y-%m-%d')
-            await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
-            await context.bot.send_message(chat_id=query.message.chat.id, text=f"График построен по данным до {latest_date}")
-
-
 # Получение данных с MOEX
 
 def get_moex_data(ticker="SBER", days=100):
@@ -250,17 +202,20 @@ def plot_stock(df, ticker, levels=[], patterns=[]):
 # Telegram команда
 
 if Update and ContextTypes:
-    async def a(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
-        await update.message.reply_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
+    async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
+        await update.message.reply_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
         data = query.data
+
+        # === Обработка обычной команды /a ===
         if data == "back_to_sectors":
             keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
             await query.edit_message_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
+
         elif data.startswith("sector:"):
             _, sector, page = data.split(":")
             page = int(page)
@@ -268,6 +223,7 @@ if Update and ContextTypes:
             start = page * TICKERS_PER_PAGE
             end = start + TICKERS_PER_PAGE
             visible = tickers[start:end]
+
             keyboard = [[InlineKeyboardButton(t, callback_data=f"ticker:{t}")] for t in visible]
             nav = []
             if start > 0:
@@ -277,10 +233,13 @@ if Update and ContextTypes:
             if nav:
                 keyboard.append(nav)
             keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="back_to_sectors")])
+
             await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
+
         elif data.startswith("ticker:"):
             ticker = data.split(":", 1)[1]
             await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ...")
+
             df = get_moex_data(ticker)
             df = analyze_indicators(df)
             levels = find_levels(df)
@@ -289,12 +248,50 @@ if Update and ContextTypes:
             rsi_series = df['RSI'].dropna()
             rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
             latest_date = df.index.max().strftime('%Y-%m-%d')
-            
-            text_summary = f"\nПоследний RSI: {rsi_value}\n"
-            text_summary += f"Актуальность данных: до {latest_date}\n"
-            
+
+            text_summary = f"
+Последний RSI: {rsi_value}
+Актуальность данных: {latest_date}
+"
+
             await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
             await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
+
+        # === Обработка команды /stan ===
+        elif data.startswith("stan_sector:"):
+            _, sector, page = data.split(":")
+            page = int(page)
+            tickers = SECTORS.get(sector, [])
+            start = page * TICKERS_PER_PAGE
+            end = start + TICKERS_PER_PAGE
+            visible = tickers[start:end]
+
+            keyboard = [[InlineKeyboardButton(t, callback_data=f"stan_ticker:{t}")] for t in visible]
+            nav = []
+            if start > 0:
+                nav.append(InlineKeyboardButton("⬅️", callback_data=f"stan_sector:{sector}:{page-1}"))
+            if end < len(tickers):
+                nav.append(InlineKeyboardButton("➡️", callback_data=f"stan_sector:{sector}:{page+1}"))
+            if nav:
+                keyboard.append(nav)
+            keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="stan_back")])
+
+            await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data == "stan_back":
+            keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
+            await query.edit_message_text("Выберите отрасль для анализа по Штану:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data.startswith("stan_ticker:"):
+            ticker = data.split(":", 1)[1]
+            await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ по Штану...")
+
+            df = get_moex_weekly_data(ticker)
+            chart = plot_stan_chart(df, ticker)
+
+            latest_date = df.index.max().strftime('%Y-%m-%d')
+            await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
+            await context.bot.send_message(chat_id=query.message.chat.id, text=f"График построен по данным на {latest_date}")
 
 
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
