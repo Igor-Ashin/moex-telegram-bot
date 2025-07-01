@@ -24,14 +24,14 @@ except ModuleNotFoundError:
     ContextTypes = None
 
 SECTORS = {
-    "Финансы": ["SBER", "T", "VTBR",  "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS" "CARM", "ZAYM", "CBOM"],
-    "Нефтегаз": ["GAZP", "NVTK", "LKOH", "ROSN", "TATNP",  "TATN",  "SNGS", "SNGSP", "BANE",  "BANEP", "RNFT"],
-    "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP","MTLR",  "VSMO", "RASP",  "SELG", "PLZL", "UGLD"],
-    "IT": ["YDEX", "DATA", "HEAD", "POSI", "VKCO", "ASTR", "IVAT", "DELI", "WUSH",  "CNRU", "DIAS", "SOFL"],
-    "Телеком": ["MTSS", "RTKMP", "RTKM" ,"MGTSP"],
+    "Финансы": ["SBER", "T", "VTBR", "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS", "CARM", "ZAYM", "CBOM"],
+    "Нефтегаз": ["GAZP", "NVTK", "LKOH", "ROSN", "TATNP", "TATN", "SNGS", "SNGSP", "BANE", "BANEP", "RNFT"],
+    "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP", "MTLR", "VSMO", "RASP", "SELG", "PLZL", "UGLD"],
+    "IT": ["YDEX", "DATA", "HEAD", "POSI", "VKCO", "ASTR", "IVAT", "DELI", "WUSH", "CNRU", "DIAS", "SOFL"],
+    "Телеком": ["MTSS", "RTKMP", "RTKM", "MGTSP"],
     "Строители": ["ETLN", "SMLT", "LSRG", "PIKK"],
-    "Ритейл": ["X5", "MGNT", "BELU", "LENT", "OZON",  "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID", "VSEH", "FIXP"],
-    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "DVEC", "TGKA", "TGKN", "TGKB",  "MSNG", "ELFV"],
+    "Ритейл": ["X5", "MGNT", "BELU", "LENT", "OZON", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID", "VSEH", "FIXP"],
+    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "DVEC", "TGKA", "TGKN", "TGKB", "MSNG", "ELFV"],
     "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
     "Агро": ["PHOR", "RAGR", "KZOS", "NKNC", "UFOSP", "KAZT", "AKRN", "NKHP"],
     "Медицина": ["MDMG", "OZPH", "PRMD", "GECO", "APTK", "LIFE", "ABIO", "GEMC"],
@@ -39,63 +39,79 @@ SECTORS = {
 }
 
 TICKERS_PER_PAGE = 10
+
 # Получение данных для Штейн
 def get_moex_weekly_data(ticker="SBER", weeks=100):
-    till = datetime.today().strftime('%Y-%m-%d')
-    from_date = (datetime.today() - pd.Timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
-    url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=7&from={from_date}&till={till}"
-    r = requests.get(url)
-    data = r.json()
-    candles = data['candles']['data']
-    columns = data['candles']['columns']
-    df = pd.DataFrame(candles, columns=columns)
-    df['begin'] = pd.to_datetime(df['begin'])
-    df.set_index('begin', inplace=True)
-    df = df.rename(columns={'close': 'CLOSE'})
-    df = df[['CLOSE']].dropna()
-    return df.tail(weeks)
+    try:
+        till = datetime.today().strftime('%Y-%m-%d')
+        from_date = (datetime.today() - pd.Timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
+        url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=7&from={from_date}&till={till}"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        candles = data['candles']['data']
+        columns = data['candles']['columns']
+        df = pd.DataFrame(candles, columns=columns)
+        df['begin'] = pd.to_datetime(df['begin'])
+        df.set_index('begin', inplace=True)
+        df = df.rename(columns={'close': 'CLOSE'})
+        df = df[['CLOSE']].dropna()
+        return df.tail(weeks)
+    except Exception as e:
+        print(f"Ошибка получения данных для {ticker}: {e}")
+        return pd.DataFrame()
 
 #построение графика штейн
 def plot_stan_chart(df, ticker):
-    df['SMA30'] = df['CLOSE'].rolling(window=30).mean()
-    df['Upper'] = df['SMA30'] + 2 * df['CLOSE'].rolling(window=30).std()
-    df['Lower'] = df['SMA30'] - 2 * df['CLOSE'].rolling(window=30).std()
+    if df.empty:
+        return None
+    
+    try:
+        df['SMA30'] = df['CLOSE'].rolling(window=30).mean()
+        df['Upper'] = df['SMA30'] + 2 * df['CLOSE'].rolling(window=30).std()
+        df['Lower'] = df['SMA30'] - 2 * df['CLOSE'].rolling(window=30).std()
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(df.index, df['CLOSE'], label='Цена', color='blue')
-    plt.plot(df.index, df['SMA30'], label='SMA 30', linewidth=2.5, color='black')
-    plt.plot(df.index, df['Upper'], label='BB верх', linestyle='--', color='gray')
-    plt.plot(df.index, df['Lower'], label='BB низ', linestyle='--', color='gray')
+        plt.figure(figsize=(12, 6))
+        plt.plot(df.index, df['CLOSE'], label='Цена', color='blue')
+        plt.plot(df.index, df['SMA30'], label='SMA 30', linewidth=2.5, color='black')
+        plt.plot(df.index, df['Upper'], label='BB верх', linestyle='--', color='gray')
+        plt.plot(df.index, df['Lower'], label='BB низ', linestyle='--', color='gray')
 
-    plt.title(f"stan: {ticker} на 1W timeframe")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    filename = f"{ticker}_stan.png"
-    plt.savefig(filename)
-    plt.close()
-    return filename
-
+        plt.title(f"stan: {ticker} на 1W timeframe")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        filename = f"{ticker}_stan.png"
+        plt.savefig(filename)
+        plt.close()
+        return filename
+    except Exception as e:
+        print(f"Ошибка построения графика для {ticker}: {e}")
+        plt.close()
+        return None
 
 # Получение данных с MOEX
-
 def get_moex_data(ticker="SBER", days=100):
-    till = datetime.today().strftime('%Y-%m-%d')
-    from_date = (datetime.today() - pd.Timedelta(days=days * 1.5)).strftime('%Y-%m-%d')
-    url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=24&from={from_date}&till={till}"
-    r = requests.get(url)
-    data = r.json()
-    candles = data['candles']['data']
-    columns = data['candles']['columns']
-    df = pd.DataFrame(candles, columns=columns)
-    df['begin'] = pd.to_datetime(df['begin'])
-    df.set_index('begin', inplace=True)
-    df = df.rename(columns={'close': 'CLOSE', 'volume': 'VOLUME'})
-    df = df[['CLOSE', 'VOLUME']].dropna()
-    return df.tail(days)
+    try:
+        till = datetime.today().strftime('%Y-%m-%d')
+        from_date = (datetime.today() - pd.Timedelta(days=days * 1.5)).strftime('%Y-%m-%d')
+        url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=24&from={from_date}&till={till}"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        candles = data['candles']['data']
+        columns = data['candles']['columns']
+        df = pd.DataFrame(candles, columns=columns)
+        df['begin'] = pd.to_datetime(df['begin'])
+        df.set_index('begin', inplace=True)
+        df = df.rename(columns={'close': 'CLOSE', 'volume': 'VOLUME'})
+        df = df[['CLOSE', 'VOLUME']].dropna()
+        return df.tail(days)
+    except Exception as e:
+        print(f"Ошибка получения данных для {ticker}: {e}")
+        return pd.DataFrame()
 
 # Вычисление RSI вручную
-
 def compute_rsi(series, window=14):
     if len(series) < window:
         return pd.Series([np.nan] * len(series), index=series.index)
@@ -109,8 +125,10 @@ def compute_rsi(series, window=14):
     return rsi.round(0)
 
 # RSI и аномальные объемы
-
 def analyze_indicators(df):
+    if df.empty:
+        return df
+    
     df['RSI'] = compute_rsi(df['CLOSE'], window=14)
     df['Volume_Mean'] = df['VOLUME'].rolling(window=10).mean()
     df['Anomaly'] = df['VOLUME'] > 1.5 * df['Volume_Mean']
@@ -123,11 +141,12 @@ def analyze_indicators(df):
     return df
 
 # Поддержка и сопротивление
-
 def find_levels(df):
+    if df.empty:
+        return []
+    
     levels = []
     closes = df['CLOSE'].values
-    indexes = np.arange(len(closes))
     local_max = argrelextrema(closes, np.greater)[0]
     local_min = argrelextrema(closes, np.less)[0]
 
@@ -143,8 +162,10 @@ def find_levels(df):
     return levels
 
 # Двойная вершина и дно
-
 def detect_double_patterns(df):
+    if df.empty or len(df) < 5:
+        return []
+    
     closes = df['CLOSE'].values
     patterns = []
     for i in range(2, len(closes) - 2):
@@ -155,143 +176,61 @@ def detect_double_patterns(df):
     return patterns
 
 # Построение графика
-
 def plot_stock(df, ticker, levels=[], patterns=[]):
-    plt.figure(figsize=(12, 6))
-    plt.plot(df.index, df['CLOSE'], label='Цена')
-
-    plt.plot(df.index, df['EMA9'], label='EMA9', linestyle='--', alpha=0.7)
-    plt.plot(df.index, df['EMA20'], label='EMA20', linestyle='--', alpha=0.7)
-    plt.plot(df.index, df['EMA50'], label='EMA50', linestyle='--', alpha=0.7)
-    plt.plot(df.index, df['EMA100'], label='EMA100', linestyle='--', alpha=0.7)  # EMA100
-    plt.plot(df.index, df['EMA200'], label='EMA200', linestyle='--', alpha=0.7)  # EMA200
-
+    if df.empty:
+        return None
     
-    for idx in df[df['Anomaly']].index:
-        volume_ratio = df.loc[idx, 'Volume_Multiplier']
-        plt.scatter(idx, df.loc[idx, 'CLOSE'], color='red')
-        plt.text(idx, df.loc[idx, 'CLOSE'], f"{volume_ratio:.1f}x", color='red', fontsize=8, ha='left')
+    try:
+        plt.figure(figsize=(12, 6))
+        plt.plot(df.index, df['CLOSE'], label='Цена')
 
-    for date, price in levels:
-        plt.axhline(price, linestyle='--', alpha=0.3)
+        plt.plot(df.index, df['EMA9'], label='EMA9', linestyle='--', alpha=0.7)
+        plt.plot(df.index, df['EMA20'], label='EMA20', linestyle='--', alpha=0.7)
+        plt.plot(df.index, df['EMA50'], label='EMA50', linestyle='--', alpha=0.7)
+        plt.plot(df.index, df['EMA100'], label='EMA100', linestyle='--', alpha=0.7)
+        plt.plot(df.index, df['EMA200'], label='EMA200', linestyle='--', alpha=0.7)
 
-    plotted_top = False
-    plotted_bottom = False
-    for name, date, price in patterns:
-        if name == 'Double Top':
-            marker = '^'
-            color = 'red'
-            label = 'Double Top' if not plotted_top else None
-            plotted_top = True
-        else:
-            marker = 'v'
-            color = 'green'
-            label = 'Double Bottom' if not plotted_bottom else None
-            plotted_bottom = True
-        plt.scatter(date, price, label=label, s=100, marker=marker, color=color)
+        # Аномальные объемы
+        for idx in df[df['Anomaly']].index:
+            volume_ratio = df.loc[idx, 'Volume_Multiplier']
+            plt.scatter(idx, df.loc[idx, 'CLOSE'], color='red')
+            plt.text(idx, df.loc[idx, 'CLOSE'], f"{volume_ratio:.1f}x", color='red', fontsize=8, ha='left')
 
-    plt.title(f"{ticker}: График с анализом")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    filename = f"{ticker}_analysis.png"
-    plt.savefig(filename)
-    plt.close()
-    return filename
+        # Уровни поддержки/сопротивления
+        for date, price in levels:
+            plt.axhline(price, linestyle='--', alpha=0.3)
 
-# Telegram команда
+        # Паттерны
+        plotted_top = False
+        plotted_bottom = False
+        for name, date, price in patterns:
+            if name == 'Double Top':
+                marker = '^'
+                color = 'red'
+                label = 'Double Top' if not plotted_top else None
+                plotted_top = True
+            else:
+                marker = 'v'
+                color = 'green'
+                label = 'Double Bottom' if not plotted_bottom else None
+                plotted_bottom = True
+            plt.scatter(date, price, label=label, s=100, marker=marker, color=color)
 
+        plt.title(f"{ticker}: График с анализом")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        filename = f"{ticker}_analysis.png"
+        plt.savefig(filename)
+        plt.close()
+        return filename
+    except Exception as e:
+        print(f"Ошибка построения графика для {ticker}: {e}")
+        plt.close()
+        return None
+
+# Telegram команды
 if Update and ContextTypes:
-    async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
-        await update.message.reply_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.callback_query
-        await query.answer()
-        data = query.data
-
-        # === Обработка обычной команды /a ===
-        if data == "back_to_sectors":
-            keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
-            await query.edit_message_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-        elif data.startswith("sector:"):
-            _, sector, page = data.split(":")
-            page = int(page)
-            tickers = SECTORS.get(sector, [])
-            start = page * TICKERS_PER_PAGE
-            end = start + TICKERS_PER_PAGE
-            visible = tickers[start:end]
-
-            keyboard = [[InlineKeyboardButton(t, callback_data=f"ticker:{t}")] for t in visible]
-            nav = []
-            if start > 0:
-                nav.append(InlineKeyboardButton("⬅️", callback_data=f"sector:{sector}:{page-1}"))
-            if end < len(tickers):
-                nav.append(InlineKeyboardButton("➡️", callback_data=f"sector:{sector}:{page+1}"))
-            if nav:
-                keyboard.append(nav)
-            keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="back_to_sectors")])
-
-            await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-        elif data.startswith("ticker:"):
-            ticker = data.split(":", 1)[1]
-            await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ...")
-
-            df = get_moex_data(ticker)
-            df = analyze_indicators(df)
-            levels = find_levels(df)
-            patterns = detect_double_patterns(df)
-            chart = plot_stock(df, ticker, levels, patterns)
-            rsi_series = df['RSI'].dropna()
-            rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
-            latest_date = df.index.max().strftime('%Y-%m-%d')
-
-            text_summary = f"\nПоследний RSI: {rsi_value}\n"
-            text_summary += f"Актуальность данных: до {latest_date}\n"
-
-            await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
-            await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
-
-        # === Обработка команды /stan ===
-        elif data.startswith("stan_sector:"):
-            _, sector, page = data.split(":")
-            page = int(page)
-            tickers = SECTORS.get(sector, [])
-            start = page * TICKERS_PER_PAGE
-            end = start + TICKERS_PER_PAGE
-            visible = tickers[start:end]
-
-            keyboard = [[InlineKeyboardButton(t, callback_data=f"stan_ticker:{t}")] for t in visible]
-            nav = []
-            if start > 0:
-                nav.append(InlineKeyboardButton("⬅️", callback_data=f"stan_sector:{sector}:{page-1}"))
-            if end < len(tickers):
-                nav.append(InlineKeyboardButton("➡️", callback_data=f"stan_sector:{sector}:{page+1}"))
-            if nav:
-                keyboard.append(nav)
-            keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="stan_back")])
-
-            await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-        elif data == "stan_back":
-            keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
-            await query.edit_message_text("Выберите отрасль для анализа по Штану:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-        elif data.startswith("stan_ticker:"):
-            ticker = data.split(":", 1)[1]
-            await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ по Штану...")
-
-            df = get_moex_weekly_data(ticker)
-            chart = plot_stan_chart(df, ticker)
-
-            latest_date = df.index.max().strftime('%Y-%m-%d')
-            await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
-            await context.bot.send_message(chat_id=query.message.chat.id, text=f"График построен по данным на {latest_date}")
-
-
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
@@ -302,26 +241,163 @@ if Update and ContextTypes:
         )
         await update.message.reply_text(text)
 
+    async def a(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
+        await update.message.reply_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
+        await update.message.reply_text("Выберите отрасль для анализа по Вайнштейну:", reply_markup=InlineKeyboardMarkup(keyboard))
+
     async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("Начинаю анализ всех акций. Это может занять некоторое время...")
+        
         for ticker in sum(SECTORS.values(), []):
             try:
                 df = get_moex_data(ticker)
+                if df.empty:
+                    await update.message.reply_text(f"❌ Не удалось получить данные для {ticker}")
+                    continue
+                    
                 df = analyze_indicators(df)
                 levels = find_levels(df)
                 patterns = detect_double_patterns(df)
                 chart = plot_stock(df, ticker, levels, patterns)
+                
+                if chart is None:
+                    await update.message.reply_text(f"❌ Ошибка при создании графика для {ticker}")
+                    continue
+                
                 rsi_series = df['RSI'].dropna()
                 rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
                 latest_date = df.index.max().strftime('%Y-%m-%d')
                 text_summary = f"\nПоследний RSI: {rsi_value}\nАктуальность данных: до {latest_date}\n"
-                await update.message.reply_photo(photo=open(chart, 'rb'))
+                
+                with open(chart, 'rb') as photo:
+                    await update.message.reply_photo(photo=photo)
                 await update.message.reply_text(f"{ticker}\n{text_summary}")
+                
+                # Удаляем файл после отправки
+                if os.path.exists(chart):
+                    os.remove(chart)
+                    
             except Exception as e:
-                await update.message.reply_text(f"Ошибка при анализе {ticker}: {e}")
+                await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
 
+    async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        data = query.data
 
+        try:
+            # === Обработка обычной команды /a ===
+            if data == "back_to_sectors":
+                keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
+                await query.edit_message_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
 
+            elif data.startswith("sector:"):
+                _, sector, page = data.split(":")
+                page = int(page)
+                tickers = SECTORS.get(sector, [])
+                start = page * TICKERS_PER_PAGE
+                end = start + TICKERS_PER_PAGE
+                visible = tickers[start:end]
 
+                keyboard = [[InlineKeyboardButton(t, callback_data=f"ticker:{t}")] for t in visible]
+                nav = []
+                if start > 0:
+                    nav.append(InlineKeyboardButton("⬅️", callback_data=f"sector:{sector}:{page-1}"))
+                if end < len(tickers):
+                    nav.append(InlineKeyboardButton("➡️", callback_data=f"sector:{sector}:{page+1}"))
+                if nav:
+                    keyboard.append(nav)
+                keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="back_to_sectors")])
+
+                await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+            elif data.startswith("ticker:"):
+                ticker = data.split(":", 1)[1]
+                await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ...")
+
+                df = get_moex_data(ticker)
+                if df.empty:
+                    await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Не удалось получить данные для {ticker}")
+                    return
+
+                df = analyze_indicators(df)
+                levels = find_levels(df)
+                patterns = detect_double_patterns(df)
+                chart = plot_stock(df, ticker, levels, patterns)
+                
+                if chart is None:
+                    await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Ошибка при создании графика для {ticker}")
+                    return
+
+                rsi_series = df['RSI'].dropna()
+                rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
+                latest_date = df.index.max().strftime('%Y-%m-%d')
+
+                text_summary = f"\nПоследний RSI: {rsi_value}\n"
+                text_summary += f"Актуальность данных: до {latest_date}\n"
+
+                with open(chart, 'rb') as photo:
+                    await context.bot.send_photo(chat_id=query.message.chat.id, photo=photo)
+                await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
+                
+                # Удаляем файл после отправки
+                if os.path.exists(chart):
+                    os.remove(chart)
+
+            # === Обработка команды /stan ===
+            elif data.startswith("stan_sector:"):
+                _, sector, page = data.split(":")
+                page = int(page)
+                tickers = SECTORS.get(sector, [])
+                start = page * TICKERS_PER_PAGE
+                end = start + TICKERS_PER_PAGE
+                visible = tickers[start:end]
+
+                keyboard = [[InlineKeyboardButton(t, callback_data=f"stan_ticker:{t}")] for t in visible]
+                nav = []
+                if start > 0:
+                    nav.append(InlineKeyboardButton("⬅️", callback_data=f"stan_sector:{sector}:{page-1}"))
+                if end < len(tickers):
+                    nav.append(InlineKeyboardButton("➡️", callback_data=f"stan_sector:{sector}:{page+1}"))
+                if nav:
+                    keyboard.append(nav)
+                keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="stan_back")])
+
+                await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+            elif data == "stan_back":
+                keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
+                await query.edit_message_text("Выберите отрасль для анализа по Вайнштейну:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+            elif data.startswith("stan_ticker:"):
+                ticker = data.split(":", 1)[1]
+                await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ по Вайнштейну...")
+
+                df = get_moex_weekly_data(ticker)
+                if df.empty:
+                    await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Не удалось получить данные для {ticker}")
+                    return
+
+                chart = plot_stan_chart(df, ticker)
+                if chart is None:
+                    await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Ошибка при создании графика для {ticker}")
+                    return
+
+                latest_date = df.index.max().strftime('%Y-%m-%d')
+                with open(chart, 'rb') as photo:
+                    await context.bot.send_photo(chat_id=query.message.chat.id, photo=photo)
+                await context.bot.send_message(chat_id=query.message.chat.id, text=f"График построен по данным на {latest_date}")
+                
+                # Удаляем файл после отправки
+                if os.path.exists(chart):
+                    os.remove(chart)
+
+        except Exception as e:
+            await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Произошла ошибка: {str(e)}")
 
 # ==== Flask сервер для поддержки работы 24/7 ====
 from flask import Flask
@@ -350,7 +426,7 @@ if ApplicationBuilder:
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("a", a))
-        app.add_handler(CommandHandler("all", all))
+        app.add_handler(CommandHandler("all", all))  # Используем функцию all
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CallbackQueryHandler(handle_callback))
         print("✅ Бот запущен и поддерживается Flask-сервером.")
