@@ -250,9 +250,8 @@ if Update and ContextTypes:
             latest_date = df.index.max().strftime('%Y-%m-%d')
 
             text_summary = f"
-Последний RSI: {rsi_value}
-Актуальность данных: {latest_date}
-"
+Последний RSI: {rsi_value}\n"
+Актуальность данных: {latest_date}\n"
 
             await context.bot.send_photo(chat_id=query.message.chat.id, photo=open(chart, 'rb'))
             await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
