@@ -285,7 +285,7 @@ if Update and ContextTypes:
             except Exception as e:
                 await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
 
-def find_sma30_crossover(ticker, days=7):
+    def find_sma30_crossover(ticker, days=7):
         """
         Находит пересечение цены снизу вверх через SMA30 за последние дни
         И проверяет, что на текущий момент цена находится выше SMA30
@@ -327,7 +327,8 @@ def find_sma30_crossover(ticker, days=7):
             
         except Exception as e:
             print(f"Ошибка при поиске пересечения SMA30 для {ticker}: {e}")
-            return None        
+            return None  
+            
     async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
         
