@@ -95,12 +95,29 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             price_delta = price_end - price_start
             price_pct = 100 * price_delta / price_start
-
-            # Логирование для отладки
-            print(f"{ticker} — moneyAD start: {ad_start:.2f}, end: {ad_end:.2f}, Δ: {ad_delta:.2f}, price %: {price_pct:.2f}")
-
-            if ad_delta > 0 or ad_delta < 0 :
-                result.append((ticker, round(price_pct, 2), round(ad_delta, 2), date_start, date_end))
+            # 💰 Среднедневной денежный оборот за период
+            turnover_series = df['volume'].iloc[-days:] * df['close'].iloc[-days:]
+            avg_turnover = turnover_series.mean()
+            
+            # 📊 Отношение дельты потока к обороту (%)
+            if avg_turnover != 0:
+                delta_vs_turnover = 100 * ad_delta / avg_turnover
+            else:
+                delta_vs_turnover = 0
+            
+            # 🪵 Лог для отладки
+            print(f"{ticker} — Δ: {ad_delta:.2f}, Price %: {price_pct:.2f}, AvgTurn: {avg_turnover:.2f}, Δ% от оборота: {delta_vs_turnover:.2f}%")
+            
+            # Добавим в итог
+            if ad_delta != 0:
+                result.append((
+                    ticker,
+                    round(price_pct, 2),
+                    round(ad_delta, 2),
+                    date_start,
+                    date_end,
+                    round(delta_vs_turnover, 2)
+    ))
         except Exception as e:
             print(f"Ошибка Money A/D для {ticker}: {e}")
             continue
@@ -124,21 +141,22 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
         msg += "```\n"
-        msg += f"{'Тикер':<6} {'Изм. цены':>9} {'Δ Потока':>15}\n"
-        msg += "-" * 34 + "\n"
-        for ticker, price_pct, ad_delta, _, _ in result_up[:10]:
-            msg += f"{ticker:<6} {price_pct:>+8.2f}% {ad_delta/1_000_000:>12.2f} млн ₽\n"
+        msg += f"{'Тикер':<6} {'Изм. цены':>9} {'Δ Потока':>15} {'Δ / Оборот':>13}\n"
+        msg += "-" * 48 + "\n"
+        for ticker, price_pct, ad_delta, _, _, delta_pct in result_up[:10]:
+            msg += f"{ticker:<6} {price_pct:>+8.2f}% {ad_delta/1_000_000:>12.2f} млн ₽ {delta_pct:>10.1f}%\n"
         msg += "```\n\n"
     
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
         msg += "```\n"
-        msg += f"{'Тикер':<6} {'Изм. цены':>9} {'Δ Потока':>15}\n"
-        msg += "-" * 34 + "\n"
-        for ticker, price_pct, ad_delta, _, _ in result_down[:10]:
-            msg += f"{ticker:<6} {price_pct:>+8.2f}% {ad_delta/1_000_000:>12.2f} млн ₽\n"
+        msg += f"{'Тикер':<6} {'Изм. цены':>9} {'Δ Потока':>15} {'Δ / Оборот':>13}\n"
+        msg += "-" * 48 + "\n"
+        for ticker, price_pct, ad_delta, _, _, delta_pct in result_down[:10]:
+            msg += f"{ticker:<6} {price_pct:>+8.2f}% {ad_delta/1_000_000:>12.2f} млн ₽ {delta_pct:>10.1f}%\n"
         msg += "```\n"
+
 
     await update.message.reply_text(msg)
 
