@@ -106,8 +106,8 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             continue
 
         if not result:
-        await update.message.reply_text("Не найдено активов с ростом или падением денежного потока (Money A/D)")
-        return
+            await update.message.reply_text("Не найдено активов с ростом или падением денежного потока (Money A/D)")
+            return
 
     # Разделим на положительные и отрицательные дельты
     result_up = [r for r in result if r[2] > 0]
