@@ -72,7 +72,7 @@ def calculate_money_ad(df):
 
 async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     days = context.user_data.get("days", 10)  # по умолчанию 10
-    await update.message.reply_text(f"🔍 Ищу Топ по росту денежного потока за {days} дней...")
+    await update.message.reply_text(f"🔍 Ищу Топ по росту и оттоку денежного потока за {days} дней...")
     
     result = []
     for ticker in sum(SECTORS.values(), []):
