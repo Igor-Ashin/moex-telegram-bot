@@ -93,7 +93,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = "🏦 Топ по росту денежного потока (Money A/D за 2 недели):\n\n"
     for ticker, price_pct, ad_delta, date_start, date_end in result:
-        msg += (f"{ticker}: Цена {price_pct:.2f}%, Дельта {ad_delta/1000000:.2f} Млн ₽ "
+        msg += (f"{ticker}: Цена {price_pct:.2f}%, Дельта {ad_delta/1000000:.0f} Млн ₽ "
                 f"(С {date_start} по {date_end})\n")
 
     await update.message.reply_text(msg)
