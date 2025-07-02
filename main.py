@@ -140,25 +140,24 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 📈 Рост
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
-        msg += "```\n"
-        msg += f"{'Тикер':<6} {'Изм. цены':>9} {'Δ Потока':>15} {'Δ / Оборот':>13}\n"
-        msg += "-" * 48 + "\n"
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}\t{'Изм. цены'}\t{'Δ Потока'}\t{'Δ / Оборот'}\n"
+        msg += f"{'-'*6}\t{'-'*9}\t{'-'*15}\t{'-'*11}\n"
         for ticker, price_pct, ad_delta, _, _, delta_pct in result_up[:10]:
-            msg += f"{ticker:<6} {price_pct:>+8.2f}% {ad_delta/1_000_000:>12.2f} млн ₽ {delta_pct:>10.1f}%\n"
-        msg += "```\n\n"
+            msg += f"{ticker:<6}\t{price_pct:+.2f}%\t{ad_delta/1_000_000:,.2f} млн ₽\t{delta_pct:.1f}%\n"
+        msg += "</pre>\n\n"
     
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
-        msg += "```\n"
-        msg += f"{'Тикер':<6} {'Изм. цены':>9} {'Δ Потока':>15} {'Δ / Оборот':>13}\n"
-        msg += "-" * 48 + "\n"
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}\t{'Изм. цены'}\t{'Δ Потока'}\t{'Δ / Оборот'}\n"
+        msg += f"{'-'*6}\t{'-'*9}\t{'-'*15}\t{'-'*11}\n"
         for ticker, price_pct, ad_delta, _, _, delta_pct in result_down[:10]:
-            msg += f"{ticker:<6} {price_pct:>+8.2f}% {ad_delta/1_000_000:>12.2f} млн ₽ {delta_pct:>10.1f}%\n"
-        msg += "```\n"
-
-
-    await update.message.reply_text(msg)
+            msg += f"{ticker:<6}\t{price_pct:+.2f}%\t{ad_delta/1_000_000:,.2f} млн ₽\t{delta_pct:.1f}%\n"
+        msg += "</pre>\n"
+    
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 
 # Получение данных для Штейн
