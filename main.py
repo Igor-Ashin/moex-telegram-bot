@@ -65,18 +65,21 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             obv_start = df['OBV'].iloc[-10]
             obv_end = df['OBV'].iloc[-1]
+
+            obv_diff = obv_end - obv_start
+            
             if obv_start != 0:
-                obv_pct = 100 * (obv_end - obv_start) / obv_start
+                obv_pct = 100 * obv_diff / abs(obv_start)
             else:
                 obv_pct = 0
 
-            price_change = df['CLOSE'].iloc[-1] - df['CLOSE'].iloc[-10]
-            price_pct = 100 * price_change / df['CLOSE'].iloc[-10]
+            price_diff = df['CLOSE'].iloc[-1] - df['CLOSE'].iloc[-10]
+            price_pct = 100 * price_diff / df['CLOSE'].iloc[-10]
 
             # Логирование для отладки — можешь убрать в бою
             print(f"{ticker} — OBV start: {obv_start:.2f}, end: {obv_end:.2f}, obv %: {obv_pct:.2f}, price %: {price_pct:.2f}")
 
-            if obv_pct > 0 and price_pct < 0:
+            if obv_diff > 0 and price_pct < 0:
                 result.append((ticker, round(price_pct, 2), round(obv_pct, 2)))
         except Exception as e:
             print(f"Ошибка OBV для {ticker}: {e}")
