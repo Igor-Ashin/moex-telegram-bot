@@ -118,29 +118,30 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     period = f"{result[0][3]}–{result[0][4]}"
 
-    msg = f"🏦 Топ по изменению денежного потока (Money A/D) за период {period}:\n\n"
+    msg = f"🏦 Топ по денежному потоку за период {date_start}–{date_end}:\n\n"
 
     # 📈 Рост
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
-        msg += "Тикер | Изм. цены | Δ Потока\n"
-        msg += "------|-----------|--------------\n"
+        msg += "```\n"
+        msg += f"{'Тикер':<6} | {'Изм. цены':>9} | {'Δ Потока':>15}\n"
+        msg += "-" * 36 + "\n"
         for ticker, price_pct, ad_delta, _, _ in result_up[:10]:
-            msg += f"{ticker:<6}| {price_pct:>+6.2f}%   | {ad_delta/1_000_000:>8.2f} млн ₽\n"
-        msg += "\n"
-
+            msg += f"{ticker:<6} | {price_pct:>+8.2f}% | {ad_delta/1_000_000:>12.2f} млн ₽\n"
+        msg += "```\n\n"
+    
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
-        msg += "Тикер | Изм. цены | Δ Потока\n"
-        msg += "------|-----------|--------------\n"
+        msg += "```\n"
+        msg += f"{'Тикер':<6} | {'Изм. цены':>9} | {'Δ Потока':>15}\n"
+        msg += "-" * 36 + "\n"
         for ticker, price_pct, ad_delta, _, _ in result_down[:10]:
-            msg += f"{ticker:<6}| {price_pct:>+6.2f}%   | {ad_delta/1_000_000:>8.2f} млн ₽\n"
+            msg += f"{ticker:<6} | {price_pct:>+8.2f}% | {ad_delta/1_000_000:>12.2f} млн ₽\n"
+        msg += "```"
 
     await update.message.reply_text(msg)
 
-
-    await update.message.reply_text(msg)
 
 # Получение данных для Штейн
 def get_moex_weekly_data(ticker="SBER", weeks=100):
