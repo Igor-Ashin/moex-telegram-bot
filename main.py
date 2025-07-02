@@ -130,8 +130,8 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result_up = [r for r in result if r[2] > 0]
     result_down = [r for r in result if r[2] < 0]
 
-    result_up.sort(key=lambda x: x[2], reverse=True)     # по убыванию
-    result_down.sort(key=lambda x: x[2])                 # по возрастанию
+    result_up.sort(key=lambda x: x[5], reverse=True)     # по убыванию
+    result_down.sort(key=lambda x: x[5])                 # по возрастанию
 
     period = f"{result[0][3]}–{result[0][4]}"
 
@@ -141,23 +141,24 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}\t{'Изм. цены'}\t{'Δ Потока'}\t{'Δ / Оборот'}\n"
-        msg += f"{'-'*6}\t{'-'*9}\t{'-'*15}\t{'-'*11}\n"
+        msg += f"{'Тикер':<8}  {'Изм. цены':<10}  {'Δ Потока':<17}  {'Δ / Оборот':<12}\n"
+        msg += f"{'-'*8}  {'-'*10}  {'-'*17}  {'-'*12}\n"
         for ticker, price_pct, ad_delta, _, _, delta_pct in result_up[:10]:
-            msg += f"{ticker:<6}\t{price_pct:+.2f}%\t{ad_delta/1_000_000:,.2f} млн ₽\t{delta_pct:.1f}%\n"
+            msg += f"{ticker:<8}  {price_pct:+9.2f}%  {ad_delta/1_000_000:15,.2f} млн ₽  {delta_pct:11.1f}%\n"
         msg += "</pre>\n\n"
     
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}\t{'Изм. цены'}\t{'Δ Потока'}\t{'Δ / Оборот'}\n"
-        msg += f"{'-'*6}\t{'-'*9}\t{'-'*15}\t{'-'*11}\n"
+        msg += f"{'Тикер':<8}  {'Изм. цены':<10}  {'Δ Потока':<17}  {'Δ / Оборот':<12}\n"
+        msg += f"{'-'*8}  {'-'*10}  {'-'*17}  {'-'*12}\n"
         for ticker, price_pct, ad_delta, _, _, delta_pct in result_down[:10]:
-            msg += f"{ticker:<6}\t{price_pct:+.2f}%\t{ad_delta/1_000_000:,.2f} млн ₽\t{delta_pct:.1f}%\n"
+            msg += f"{ticker:<8}  {price_pct:+9.2f}%  {ad_delta/1_000_000:15,.2f} млн ₽  {delta_pct:11.1f}%\n"
         msg += "</pre>\n"
     
     await update.message.reply_text(msg, parse_mode="HTML")
+
 
 
 # Получение данных для Штейн
