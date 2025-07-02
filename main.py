@@ -59,7 +59,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if df.empty or len(df) < 15:
                 continue
 
-            df = df.rename(columns={'CLOSE': 'close', 'VOLUME': 'volume'})  # если еще не переименовано
+            df = df.rename(columns={'close': 'close', 'volume': 'volume'})  # если еще не переименовано
             df = calculate_money_ad(df)
 
             ad_start = df['money_ad'].iloc[-10]
@@ -113,8 +113,8 @@ def get_moex_weekly_data(ticker="SBER", weeks=100):
         df['begin'] = pd.to_datetime(df['begin'])
         df = df.sort_values('begin')
         df.set_index('begin', inplace=True)
-        df = df.rename(columns={'close': 'CLOSE'})
-        df = df[['CLOSE']].dropna()
+        df = df.rename(columns={'close': 'close'})
+        df = df[['close']].dropna()
         return df.tail(weeks)
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
@@ -126,12 +126,12 @@ def plot_stan_chart(df, ticker):
         return None
     
     try:
-        df['SMA30'] = df['CLOSE'].rolling(window=30).mean()
-        df['Upper'] = df['SMA30'] + 2 * df['CLOSE'].rolling(window=30).std()
-        df['Lower'] = df['SMA30'] - 2 * df['CLOSE'].rolling(window=30).std()
+        df['SMA30'] = df['close'].rolling(window=30).mean()
+        df['Upper'] = df['SMA30'] + 2 * df['close'].rolling(window=30).std()
+        df['Lower'] = df['SMA30'] - 2 * df['close'].rolling(window=30).std()
 
         plt.figure(figsize=(12, 6))
-        plt.plot(df.index, df['CLOSE'], label='Цена', color='blue')
+        plt.plot(df.index, df['close'], label='Цена', color='blue')
         plt.plot(df.index, df['SMA30'], label='SMA 30', linewidth=2.5, color='black')
         plt.plot(df.index, df['Upper'], label='BB верх', linestyle='--', color='gray')
         plt.plot(df.index, df['Lower'], label='BB низ', linestyle='--', color='gray')
@@ -164,8 +164,13 @@ def get_moex_data(ticker="SBER", days=100):
         df['begin'] = pd.to_datetime(df['begin'])
         df = df.sort_values('begin')  # сортировка по дате
         df.set_index('begin', inplace=True)
-        df = df.rename(columns={'close': 'CLOSE', 'volume': 'VOLUME'})
-        df = df[['CLOSE', 'VOLUME']].dropna()
+        df = df.rename(columns={
+            'close': 'close',
+            'volume': 'volume',
+            'high': 'high',
+            'low': 'low'
+        })
+        df = df[['close', 'volume', 'high', 'low']].dropna()
         return df.tail(days)
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
@@ -189,15 +194,15 @@ def analyze_indicators(df):
     if df.empty:
         return df
     
-    df['RSI'] = compute_rsi(df['CLOSE'], window=14)
-    df['Volume_Mean'] = df['VOLUME'].rolling(window=10).mean()
-    df['Anomaly'] = df['VOLUME'] > 1.5 * df['Volume_Mean']
-    df['Volume_Multiplier'] = df['VOLUME'] / df['Volume_Mean']
-    df['EMA9'] = df['CLOSE'].ewm(span=9, adjust=False).mean()
-    df['EMA20'] = df['CLOSE'].ewm(span=20, adjust=False).mean()
-    df['EMA50'] = df['CLOSE'].ewm(span=50, adjust=False).mean()
-    df['EMA100'] = df['CLOSE'].ewm(span=100, adjust=False).mean()
-    df['EMA200'] = df['CLOSE'].ewm(span=200, adjust=False).mean()
+    df['RSI'] = compute_rsi(df['close'], window=14)
+    df['Volume_Mean'] = df['volume'].rolling(window=10).mean()
+    df['Anomaly'] = df['volume'] > 1.5 * df['Volume_Mean']
+    df['Volume_Multiplier'] = df['volume'] / df['Volume_Mean']
+    df['EMA9'] = df['close'].ewm(span=9, adjust=False).mean()
+    df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+    df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+    df['EMA100'] = df['close'].ewm(span=100, adjust=False).mean()
+    df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
     return df
 
 # Поддержка и сопротивление
@@ -206,7 +211,7 @@ def find_levels(df):
         return []
     
     levels = []
-    closes = df['CLOSE'].values
+    closes = df['close'].values
     local_max = argrelextrema(closes, np.greater)[0]
     local_min = argrelextrema(closes, np.less)[0]
 
@@ -226,7 +231,7 @@ def detect_double_patterns(df):
     if df.empty or len(df) < 5:
         return []
     
-    closes = df['CLOSE'].values
+    closes = df['close'].values
     patterns = []
     for i in range(2, len(closes) - 2):
         if closes[i-2] < closes[i-1] < closes[i] and closes[i] > closes[i+1] > closes[i+2]:
@@ -242,7 +247,7 @@ def plot_stock(df, ticker, levels=[], patterns=[]):
     
     try:
         plt.figure(figsize=(12, 6))
-        plt.plot(df.index, df['CLOSE'], label='Цена')
+        plt.plot(df.index, df['close'], label='Цена')
 
         plt.plot(df.index, df['EMA9'], label='EMA9', linestyle='--', alpha=0.7)
         plt.plot(df.index, df['EMA20'], label='EMA20', linestyle='--', alpha=0.7)
@@ -253,8 +258,8 @@ def plot_stock(df, ticker, levels=[], patterns=[]):
         # Аномальные объемы
         for idx in df[df['Anomaly']].index:
             volume_ratio = df.loc[idx, 'Volume_Multiplier']
-            plt.scatter(idx, df.loc[idx, 'CLOSE'], color='red')
-            plt.text(idx, df.loc[idx, 'CLOSE'], f"{volume_ratio:.1f}x", color='red', fontsize=8, ha='left')
+            plt.scatter(idx, df.loc[idx, 'close'], color='red')
+            plt.text(idx, df.loc[idx, 'close'], f"{volume_ratio:.1f}x", color='red', fontsize=8, ha='left')
 
         # Уровни поддержки/сопротивления
         for date, price in levels:
@@ -358,10 +363,10 @@ if Update and ContextTypes:
                 return None
             
             # Вычисляем SMA30
-            df['SMA30'] = df['CLOSE'].rolling(window=30).mean()
+            df['SMA30'] = df['close'].rolling(window=30).mean()
             
             # Проверяем, что текущая цена выше SMA30
-            current_close = df['CLOSE'].iloc[-1]
+            current_close = df['close'].iloc[-1]
             current_sma30 = df['SMA30'].iloc[-1]
             
             if current_close <= current_sma30:
@@ -374,8 +379,8 @@ if Update and ContextTypes:
             
             # Ищем пересечение снизу вверх
             for i in range(1, len(recent_df)):
-                prev_close = recent_df['CLOSE'].iloc[i-1]
-                curr_close = recent_df['CLOSE'].iloc[i]
+                prev_close = recent_df['close'].iloc[i-1]
+                curr_close = recent_df['close'].iloc[i]
                 prev_sma = recent_df['SMA30'].iloc[i-1]
                 curr_sma = recent_df['SMA30'].iloc[i]
                 
