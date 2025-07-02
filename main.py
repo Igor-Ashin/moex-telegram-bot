@@ -326,7 +326,7 @@ if Update and ContextTypes:
             "/all — анализ голубых фишек Мосбиржи\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
-            "/long_moneyflow - Топ по росту денежного потока (Money A/D) за 2 недели\n"
+            "/moneyflow - Топ по росту денежного потока (Money A/D)\n"
         )
         await update.message.reply_text(text)
 
