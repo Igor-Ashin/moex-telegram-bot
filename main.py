@@ -105,20 +105,39 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print(f"Ошибка Money A/D для {ticker}: {e}")
             continue
 
-    if not result:
-        await update.message.reply_text("Не найдено активов с ростом денежного потока (Money A/D)")
+        if not result:
+        await update.message.reply_text("Не найдено активов с ростом или падением денежного потока (Money A/D)")
         return
 
-    # Сортировка по дельте денежного потока (рубли)
-    result.sort(key=lambda x: x[2], reverse=True)
-    result = result[:10]  # топ-10
+    # Разделим на положительные и отрицательные дельты
+    result_up = [r for r in result if r[2] > 0]
+    result_down = [r for r in result if r[2] < 0]
 
-    msg = "🏦 Топ по росту денежного потока (Money A/D):\n\n"
-    msg += "Тикер | Изм. цены | Δ Потока     | Период\n"
-    msg += "------|-----------|--------------|----------------\n"
-    for ticker, price_pct, ad_delta, date_start, date_end in result:
-        period = f"{date_start}–{date_end}"
-        msg += f"{ticker:<6}| {price_pct:>+6.2f}%   | {ad_delta/1_000_000:>8.2f} млрд ₽ | {period}\n"
+    result_up.sort(key=lambda x: x[2], reverse=True)     # по убыванию
+    result_down.sort(key=lambda x: x[2])                 # по возрастанию
+
+    period = f"{result[0][3]}–{result[0][4]}"
+
+    msg = f"🏦 Топ по изменению денежного потока (Money A/D) за период {period}:\n\n"
+
+    # 📈 Рост
+    if result_up:
+        msg += "📈 Топ 10 по росту:\n"
+        msg += "Тикер | Изм. цены | Δ Потока\n"
+        msg += "------|-----------|--------------\n"
+        for ticker, price_pct, ad_delta, _, _ in result_up[:10]:
+            msg += f"{ticker:<6}| {price_pct:>+6.2f}%   | {ad_delta/1_000_000:>8.2f} млн ₽\n"
+        msg += "\n"
+
+    # 📉 Падение
+    if result_down:
+        msg += "📉 Топ 10 по оттоку:\n"
+        msg += "Тикер | Изм. цены | Δ Потока\n"
+        msg += "------|-----------|--------------\n"
+        for ticker, price_pct, ad_delta, _, _ in result_down[:10]:
+            msg += f"{ticker:<6}| {price_pct:>+6.2f}%   | {ad_delta/1_000_000:>8.2f} млн ₽\n"
+
+    await update.message.reply_text(msg)
 
 
     await update.message.reply_text(msg)
