@@ -113,10 +113,13 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result.sort(key=lambda x: x[2], reverse=True)
     result = result[:10]  # топ-10
 
-    msg = "🏦 Топ по росту денежного потока (Money A/D за 2 недели):\n\n"
+    msg = "🏦 Топ по росту денежного потока (Money A/D):\n\n"
+    msg += "Тикер | Изм. цены | Δ Потока     | Период\n"
+    msg += "------|-----------|--------------|----------------\n"
     for ticker, price_pct, ad_delta, date_start, date_end in result:
-        msg += (f"{ticker}: Цена {price_pct:.2f}%, Дельта {ad_delta/1000000:.0f} Млн ₽ "
-                f"(С {date_start} по {date_end})\n")
+        period = f"{date_start}–{date_end}"
+        msg += f"{ticker:<6}| {price_pct:>+6.2f}%   | {ad_delta/1_000_000:>8.2f} млрд ₽ | {period}\n"
+
 
     await update.message.reply_text(msg)
 
