@@ -40,6 +40,54 @@ SECTORS = {
 
 TICKERS_PER_PAGE = 10
 
+# === Новая команда: long_obv ===
+def calculate_obv(df):
+    obv = [0]
+    for i in range(1, len(df)):
+        if df['CLOSE'].iloc[i] > df['CLOSE'].iloc[i - 1]:
+            obv.append(obv[-1] + df['VOLUME'].iloc[i])
+        elif df['CLOSE'].iloc[i] < df['CLOSE'].iloc[i - 1]:
+            obv.append(obv[-1] - df['VOLUME'].iloc[i])
+        else:
+            obv.append(obv[-1])
+    df['OBV'] = obv
+    return df
+
+async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу дивергенции OBV...")
+    result = []
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            df = get_moex_data(ticker, days=30)
+            if df.empty or len(df) < 15:
+                continue
+            df = calculate_obv(df)
+            obv_change = df['OBV'].iloc[-1] - df['OBV'].iloc[-10]
+            obv_pct = 100 * obv_change / abs(df['OBV'].iloc[-10]) if df['OBV'].iloc[-10] != 0 else 0
+            price_change = df['CLOSE'].iloc[-1] - df['CLOSE'].iloc[-10]
+            price_pct = 100 * price_change / df['CLOSE'].iloc[-10]
+            if obv_pct > 0 and price_pct < 0:
+                result.append((ticker, round(price_pct, 2), round(obv_pct, 2)))
+        except Exception as e:
+            print(f"Ошибка OBV для {ticker}: {e}")
+            continue
+
+    if not result:
+        await update.message.reply_text("Не найдено дивергенций (OBV растет, а цена падает)")
+        return
+
+    # сортировка по наибольшей разнице в % между OBV и ценой
+    result.sort(key=lambda x: (x[2] - x[1]), reverse=True)
+    result = result[:5]  # top 5
+        return
+
+    msg = "📉 OBV растет, а цена падает (за 2 недели):\n\n"
+    for ticker, price_delta, obv_delta in result:
+        msg += f"{ticker}: Цена {price_delta}%, OBV +{obv_delta}%
+"
+    await update.message.reply_text(msg)
+
+
 # Получение данных для Штейн
 def get_moex_weekly_data(ticker="SBER", weeks=100):
     try:
@@ -239,6 +287,7 @@ if Update and ContextTypes:
             "/all — анализ голубых фишек Мосбиржи\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
+            "/long_obv - поиск бычьей дивергенции между ценой и OBV\n"
         )
         await update.message.reply_text(text)
 
@@ -508,6 +557,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("all", all))  # Используем функцию all
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
+        app.add_handler(CommandHandler("long_obv", long_obv))
         app.add_handler(CallbackQueryHandler(handle_callback))
         print("✅ Бот запущен и поддерживается Flask-сервером.")
         app.run_polling()
