@@ -62,10 +62,20 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if df.empty or len(df) < 15:
                 continue
             df = calculate_obv(df)
-            obv_change = df['OBV'].iloc[-1] - df['OBV'].iloc[-10]
-            obv_pct = 100 * obv_change / abs(df['OBV'].iloc[-10]) if df['OBV'].iloc[-10] != 0 else 0
+
+            obv_start = df['OBV'].iloc[-10]
+            obv_end = df['OBV'].iloc[-1]
+            if obv_start != 0:
+                obv_pct = 100 * (obv_end - obv_start) / obv_start
+            else:
+                obv_pct = 0
+
             price_change = df['CLOSE'].iloc[-1] - df['CLOSE'].iloc[-10]
             price_pct = 100 * price_change / df['CLOSE'].iloc[-10]
+
+            # Логирование для отладки — можешь убрать в бою
+            print(f"{ticker} — OBV start: {obv_start:.2f}, end: {obv_end:.2f}, obv %: {obv_pct:.2f}, price %: {price_pct:.2f}")
+
             if obv_pct > 0 and price_pct < 0:
                 result.append((ticker, round(price_pct, 2), round(obv_pct, 2)))
         except Exception as e:
@@ -78,7 +88,7 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # сортировка по наибольшей разнице в % между OBV и ценой
     result.sort(key=lambda x: (x[2] - x[1]), reverse=True)
-    result = result[:5]  # top 5
+    result = result[:5]  # топ-5
 
     msg = "📉 OBV растет, а цена падает (за 2 недели):\n\n"
     for ticker, price_delta, obv_delta in result:
