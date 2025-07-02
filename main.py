@@ -79,7 +79,6 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # сортировка по наибольшей разнице в % между OBV и ценой
     result.sort(key=lambda x: (x[2] - x[1]), reverse=True)
     result = result[:5]  # top 5
-        return
 
     msg = "📉 OBV растет, а цена падает (за 2 недели):\n\n"
     for ticker, price_delta, obv_delta in result:
