@@ -13,8 +13,8 @@ import asyncio
 
 # Заменяем telegram на условный заглушку или комментарий, чтобы избежать ошибки в окружении
 try:
-    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-    from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
+    from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 except ModuleNotFoundError:
     print("Библиотека 'python-telegram-bot' не установлена.")
     Update = None
@@ -40,6 +40,26 @@ SECTORS = {
 
 TICKERS_PER_PAGE = 10
 
+ASK_DAYS = 1  # состояние для выбора дней
+
+async def ask_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📅 Введите количество дней для расчета дельты денежного потока (например, 10):")
+    return ASK_DAYS
+
+async def receive_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        days = int(update.message.text)
+        if not (1 <= days <= 60):
+            await update.message.reply_text("⚠️ Введите число от 1 до 30.")
+            return ASK_DAYS
+
+        context.user_data['days'] = days
+        await long_moneyflow(update, context)
+        return ConversationHandler.END
+    except ValueError:
+        await update.message.reply_text("⚠️ Введите целое число, например: 10")
+        return ASK_DAYS
+
 # === Новая команда: long_moneyflow ===
 def calculate_money_ad(df):
     df = df.copy()
@@ -51,26 +71,28 @@ def calculate_money_ad(df):
     return df
 
 async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу Топ по росту денежного потока (Money A/D)...")
+    days = context.user_data.get("days", 10)  # по умолчанию 10
+    await update.message.reply_text(f"🔍 Ищу Топ по росту денежного потока за {days} дней...")
+    
     result = []
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data(ticker, days=30)
-            if df.empty or len(df) < 15:
+            df = get_moex_data(ticker, days=days + 5)  # с запасом
+            if df.empty or len(df) < days + 1:
                 continue
 
             df = df.rename(columns={'close': 'close', 'volume': 'volume'})  # если еще не переименовано
             df = calculate_money_ad(df)
 
-            ad_start = df['money_ad'].iloc[-10]
+            ad_start = df['money_ad'].iloc[-(days+1)]
             ad_end = df['money_ad'].iloc[-1]
             ad_delta = ad_end - ad_start
 
-            price_start = df['close'].iloc[-10]
+            price_start = df['close'].iloc[-(days+1)]
             price_end = df['close'].iloc[-1]
-            date_start = df.index[-10].strftime('%d.%m.%y')
+            date_start = df.index[-(days+1)].strftime('%d.%m.%y')
             date_end = df.index[-1].strftime('%d.%m.%y')
-
+            
             price_delta = price_end - price_start
             price_pct = 100 * price_delta / price_start
 
@@ -576,6 +598,17 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
         app.add_handler(CallbackQueryHandler(handle_callback))
+
+        # === Хендлер с диалогом выбора дней ===
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("moneyflow", ask_days)],
+            states={
+                ASK_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_days)]
+            },
+            fallbacks=[],
+        )
+        app.add_handler(conv_handler)
+        
         print("✅ Бот запущен и поддерживается Flask-сервером.")
         app.run_polling()
 else:
