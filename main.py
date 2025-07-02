@@ -54,7 +54,7 @@ def calculate_obv(df):
     return df
 
 async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу дивергенции OBV...")
+    await update.message.reply_text("🔍 Ищу ТОП акций по росту OBV...")
     result = []
     for ticker in sum(SECTORS.values(), []):
         try:
