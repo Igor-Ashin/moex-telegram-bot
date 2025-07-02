@@ -112,6 +112,7 @@ def get_moex_weekly_data(ticker="SBER", weeks=100):
         columns = data['candles']['columns']
         df = pd.DataFrame(candles, columns=columns)
         df['begin'] = pd.to_datetime(df['begin'])
+        df = df.sort_values('begin')
         df.set_index('begin', inplace=True)
         df = df.rename(columns={'close': 'CLOSE'})
         df = df[['CLOSE']].dropna()
@@ -162,6 +163,7 @@ def get_moex_data(ticker="SBER", days=100):
         columns = data['candles']['columns']
         df = pd.DataFrame(candles, columns=columns)
         df['begin'] = pd.to_datetime(df['begin'])
+        df = df.sort_values('begin')  # сортировка по дате
         df.set_index('begin', inplace=True)
         df = df.rename(columns={'close': 'CLOSE', 'volume': 'VOLUME'})
         df = df[['CLOSE', 'VOLUME']].dropna()
