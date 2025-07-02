@@ -68,19 +68,25 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             obv_delta = obv_end - obv_start
             
+            price_start = df['CLOSE'].iloc[-10]
+            price_end = df['CLOSE'].iloc[-1]
+            date_start = df.index[-10].strftime('%d.%m.%y')
+            date_end = df.index[-1].strftime('%d.%m.%y')
+
             if obv_start != 0:
                 obv_pct = 100 * obv_delta / abs(obv_start)
             else:
                 obv_pct = 0
 
-            price_delta = df['CLOSE'].iloc[-1] - df['CLOSE'].iloc[-10]
-            price_pct = 100 * price_delta / df['CLOSE'].iloc[-10]
+            price_delta = price_end - price_start
+            price_pct = 100 * price_delta / price_start
 
             # Логирование для отладки — можешь убрать в бою
             print(f"{ticker} — OBV start: {obv_start:.2f}, end: {obv_end:.2f}, obv %: {obv_pct:.2f}, price %: {price_pct:.2f}")
 
-            if obv_delta > 0 and price_pct < 0:
-                result.append((ticker, round(price_pct, 2), round(obv_delta, 2)))
+            #if obv_delta > 0 and price_pct < 0:
+            if obv_delta > 0 :    
+                result.append((ticker, round(price_pct, 2), round(obv_delta, 2), price_start, price_end, date_start, date_end))
         except Exception as e:
             print(f"Ошибка OBV для {ticker}: {e}")
             continue
@@ -89,15 +95,15 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Не найдено дивергенций (OBV растет, а цена падает)")
         return
 
-    # сортировка по наибольшей разнице в % между OBV и ценой
-    result.sort(key=lambda x: (x[2]), reverse=True)
-    result = result[:5]  # топ-5
+    # сортировка по дельте OBV (абсолютное значение)
+    result.sort(key=lambda x: x[2], reverse=True)
+    result = result[:10]  # топ-10
 
-    msg = "📉 OBV растет, а цена падает (за 2 недели):\n\n"
-    for ticker, price_pct, obv_delta in result:
-        msg += f"{ticker}: Цена {price_pct:.2f}%, OBV {obv_delta/1000000:.2f} Млн\n"
+    msg = "Топ по росту OBV (за 2 недели):\n\n"
+    for ticker, price_pct, obv_delta, price_start, price_end, date_start, date_end in result:
+        msg += (f"{ticker}: Цена {price_pct:.2f}%, OBV {obv_delta/1_000_000:.2f} Млн "
+                f"(Цена на {date_start} = {price_start:.6f}, Цена на {date_end} = {price_end:.6f})\n")
     await update.message.reply_text(msg)
-
 
 # Получение данных для Штейн
 def get_moex_weekly_data(ticker="SBER", weeks=100):
@@ -300,7 +306,7 @@ if Update and ContextTypes:
             "/all — анализ голубых фишек Мосбиржи\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
-            "/long_obv - поиск бычьей дивергенции между ценой и OBV\n"
+            "/long_obv - Топ по росту OBV за 10 свечей\n"
         )
         await update.message.reply_text(text)
 
