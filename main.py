@@ -83,7 +83,7 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "📉 OBV растет, а цена падает (за 2 недели):\n\n"
     for ticker, price_delta, obv_delta in result:
         msg += f"{ticker}: Цена {price_delta}%, OBV +{obv_delta}%
-""
+"
     await update.message.reply_text(msg)
 
 
