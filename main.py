@@ -80,7 +80,7 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print(f"{ticker} — OBV start: {obv_start:.2f}, end: {obv_end:.2f}, obv %: {obv_pct:.2f}, price %: {price_pct:.2f}")
 
             if obv_delta > 0 and price_pct < 0:
-                result.append((ticker, round(price_pct, 2), round(obv_pct, 2)))
+                result.append((ticker, round(price_pct, 2), round(obv_delta, 2)))
         except Exception as e:
             print(f"Ошибка OBV для {ticker}: {e}")
             continue
@@ -90,11 +90,11 @@ async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # сортировка по наибольшей разнице в % между OBV и ценой
-    result.sort(key=lambda x: (x[2] - x[1]), reverse=True)
+    result.sort(key=lambda x: (x[2]), reverse=True)
     result = result[:5]  # топ-5
 
     msg = "📉 OBV растет, а цена падает (за 2 недели):\n\n"
-    for ticker, price_delta, obv_delta in result:
+    for ticker, price_pct, obv_delta in result:
         msg += f"{ticker}: Цена {price_pct:.2f}%, OBV {obv_delta/1000000:.2f} Млн\n"
     await update.message.reply_text(msg)
 
