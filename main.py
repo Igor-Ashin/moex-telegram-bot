@@ -123,21 +123,22 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 📈 Рост
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
-        msg += "__________________\n"
-        msg += f"{'Тикер':<6} | {'Изм. цены':>9} | {'Δ Потока':>15}\n"
-        msg += "-" * 36 + "\n"
+        msg += "```\n"
+        msg += f"{'Тикер':<6} {'Изм. цены':>9} {'Δ Потока':>15}\n"
+        msg += "-" * 34 + "\n"
         for ticker, price_pct, ad_delta, _, _ in result_up[:10]:
-            msg += f"{ticker:<6} | {price_pct:>+8.2f}% | {ad_delta/1_000_000:>12.2f} млн ₽\n"
-        msg += "__________________\n\n"
+            msg += f"{ticker:<6} {price_pct:>+8.2f}% {ad_delta/1_000_000:>12.2f} млн ₽\n"
+        msg += "```\n\n"
     
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
-        msg += "__________________\n"
-        msg += f"{'Тикер':<6} | {'Изм. цены':>9} | {'Δ Потока':>15}\n"
-        msg += "-" * 36 + "\n"
+        msg += "```\n"
+        msg += f"{'Тикер':<6} {'Изм. цены':>9} {'Δ Потока':>15}\n"
+        msg += "-" * 34 + "\n"
         for ticker, price_pct, ad_delta, _, _ in result_down[:10]:
-            msg += f"{ticker:<6} | {price_pct:>+8.2f}% | {ad_delta/1_000_000:>12.2f} млн ₽\n"
+            msg += f"{ticker:<6} {price_pct:>+8.2f}% {ad_delta/1_000_000:>12.2f} млн ₽\n"
+        msg += "```\n"
 
     await update.message.reply_text(msg)
 
