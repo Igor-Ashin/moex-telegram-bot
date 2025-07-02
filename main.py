@@ -77,8 +77,8 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Логирование для отладки
             print(f"{ticker} — moneyAD start: {ad_start:.2f}, end: {ad_end:.2f}, Δ: {ad_delta:.2f}, price %: {price_pct:.2f}")
 
-            if ad_delta > 0:
-                result.append((ticker, round(price_pct, 2), round(ad_delta, 2), price_start, price_end, date_start, date_end))
+            if ad_delta > 0 or ad_delta < 0 :
+                result.append((ticker, round(price_pct, 2), round(ad_delta, 2), date_start, date_end))
         except Exception as e:
             print(f"Ошибка Money A/D для {ticker}: {e}")
             continue
@@ -92,8 +92,8 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = result[:10]  # топ-10
 
     msg = "🏦 Топ по росту денежного потока (Money A/D за 2 недели):\n\n"
-    for ticker, price_pct, ad_delta, price_start, price_end, date_start, date_end in result:
-        msg += (f"{ticker}: Цена {price_pct:.2f}%, Денежный поток {ad_delta/1_000_000:.2f} Млн ₽ "
+    for ticker, price_pct, ad_delta, date_start, date_end in result:
+        msg += (f"{ticker}: Цена {price_pct:.2f}%, Денежный поток {ad_delta/1000000:.2f} Млн ₽ "
                 f"(Дата отсчета {date_start}, Текущая дата {date_end})\n")
 
     await update.message.reply_text(msg)
