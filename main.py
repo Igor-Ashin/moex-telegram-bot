@@ -40,69 +40,62 @@ SECTORS = {
 
 TICKERS_PER_PAGE = 10
 
-# === Новая команда: long_obv ===
-def calculate_obv(df):
-    obv = [0]
-    for i in range(1, len(df)):
-        if df['CLOSE'].iloc[i] > df['CLOSE'].iloc[i - 1]:
-            obv.append(obv[-1] + df['VOLUME'].iloc[i])
-        elif df['CLOSE'].iloc[i] < df['CLOSE'].iloc[i - 1]:
-            obv.append(obv[-1] - df['VOLUME'].iloc[i])
-        else:
-            obv.append(obv[-1])
-    df['OBV'] = obv
+# === Новая команда: long_moneyflow ===
+def calculate_money_ad(df):
+    df = df.copy()
+    df['TYP'] = (df['high'] + df['low'] + df['close']) / 3
+    df['CLV'] = ((df['close'] - df['low']) - (df['high'] - df['close'])) / (df['high'] - df['low'])
+    df['CLV'] = df['CLV'].fillna(0)
+    df['money_flow'] = df['CLV'] * df['volume'] * df['TYP']
+    df['money_ad'] = df['money_flow'].cumsum()
     return df
 
-async def long_obv(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу ТОП акций по росту OBV...")
+async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу Топ по росту денежного потока (Money A/D)...")
     result = []
     for ticker in sum(SECTORS.values(), []):
         try:
             df = get_moex_data(ticker, days=30)
             if df.empty or len(df) < 15:
                 continue
-            df = calculate_obv(df)
 
-            obv_start = df['OBV'].iloc[-10]
-            obv_end = df['OBV'].iloc[-1]
+            df = df.rename(columns={'CLOSE': 'close', 'VOLUME': 'volume'})  # если еще не переименовано
+            df = calculate_money_ad(df)
 
-            obv_delta = obv_end - obv_start
-            
-            price_start = df['CLOSE'].iloc[-10]
-            price_end = df['CLOSE'].iloc[-1]
+            ad_start = df['money_ad'].iloc[-10]
+            ad_end = df['money_ad'].iloc[-1]
+            ad_delta = ad_end - ad_start
+
+            price_start = df['close'].iloc[-10]
+            price_end = df['close'].iloc[-1]
             date_start = df.index[-10].strftime('%d.%m.%y')
             date_end = df.index[-1].strftime('%d.%m.%y')
-
-            if obv_start != 0:
-                obv_pct = 100 * obv_delta / abs(obv_start)
-            else:
-                obv_pct = 0
 
             price_delta = price_end - price_start
             price_pct = 100 * price_delta / price_start
 
-            # Логирование для отладки — можешь убрать в бою
-            print(f"{ticker} — OBV start: {obv_start:.2f}, end: {obv_end:.2f}, obv %: {obv_pct:.2f}, price %: {price_pct:.2f}")
+            # Логирование для отладки
+            print(f"{ticker} — moneyAD start: {ad_start:.2f}, end: {ad_end:.2f}, Δ: {ad_delta:.2f}, price %: {price_pct:.2f}")
 
-            #if obv_delta > 0 and price_pct < 0:
-            if obv_delta > 0 :    
-                result.append((ticker, round(price_pct, 2), round(obv_delta, 2), price_start, price_end, date_start, date_end))
+            if ad_delta > 0:
+                result.append((ticker, round(price_pct, 2), round(ad_delta, 2), price_start, price_end, date_start, date_end))
         except Exception as e:
-            print(f"Ошибка OBV для {ticker}: {e}")
+            print(f"Ошибка Money A/D для {ticker}: {e}")
             continue
 
     if not result:
-        await update.message.reply_text("Не найдено дивергенций (OBV растет, а цена падает)")
+        await update.message.reply_text("Не найдено активов с ростом денежного потока (Money A/D)")
         return
 
-    # сортировка по дельте OBV (абсолютное значение)
+    # Сортировка по дельте денежного потока (рубли)
     result.sort(key=lambda x: x[2], reverse=True)
     result = result[:10]  # топ-10
 
-    msg = "Топ по росту OBV (за 2 недели):\n\n"
-    for ticker, price_pct, obv_delta, price_start, price_end, date_start, date_end in result:
-        msg += (f"{ticker}: Цена {price_pct:.2f}%, OBV {obv_delta/1_000_000:.2f} Млн "
-                f"(Цена на {date_start} = {price_start:.6f}, Цена на {date_end} = {price_end:.6f})\n")
+    msg = "🏦 Топ по росту денежного потока (Money A/D за 2 недели):\n\n"
+    for ticker, price_pct, ad_delta, price_start, price_end, date_start, date_end in result:
+        msg += (f"{ticker}: Цена {price_pct:.2f}%, Денежный поток {ad_delta/1_000_000:.2f} Млн ₽ "
+                f"(Дата отсчета {date_start}, Текущая дата {date_end})\n")
+
     await update.message.reply_text(msg)
 
 # Получение данных для Штейн
@@ -306,7 +299,7 @@ if Update and ContextTypes:
             "/all — анализ голубых фишек Мосбиржи\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
-            "/long_obv - Топ по росту OBV за 10 свечей\n"
+            "/long_moneyflow - Топ по росту денежного потока (Money A/D) за 2 недели\n"
         )
         await update.message.reply_text(text)
 
@@ -576,7 +569,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("all", all))  # Используем функцию all
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
-        app.add_handler(CommandHandler("long_obv", long_obv))
+        app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
         app.add_handler(CallbackQueryHandler(handle_callback))
         print("✅ Бот запущен и поддерживается Flask-сервером.")
         app.run_polling()
