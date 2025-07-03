@@ -60,6 +60,104 @@ async def receive_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Введите целое число, например: 10")
         return ASK_DAYS
 
+
+async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Команда для показа топ 10 перекупленных и топ 10 перепроданных акций по RSI
+    """
+    await update.message.reply_text("🔍 Анализирую RSI всех акций. Это может занять некоторое время...")
+    
+    overbought_stocks = []  # RSI > 70
+    oversold_stocks = []    # RSI < 30
+    
+    # Проходим по всем тикерам
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            # Получаем данные за последние 30 дней (с запасом для RSI)
+            df = get_moex_data(ticker, days=30)
+            if df.empty or len(df) < 15:  # Минимум 15 дней для корректного RSI
+                continue
+            
+            # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
+            filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
+            filter_avg_turnover = filter_turnover_series.mean()
+            
+            # ❌ Фильтр по минимальному обороту: 50 млн руб за последние 10 дней
+            if filter_avg_turnover < 50_000_000:
+                continue
+            
+            # Вычисляем RSI
+            rsi = compute_rsi(df['close'], window=14)
+            if rsi.empty:
+                continue
+                
+            # Берем последнее значение RSI
+            current_rsi = rsi.iloc[-1]
+            if pd.isna(current_rsi):
+                continue
+                
+            # Текущая цена и дата
+            current_price = df['close'].iloc[-1]
+            current_date = df.index[-1].strftime('%d.%m.%y')
+            
+            # Среднедневной оборот для отображения
+            avg_turnover_mln = filter_avg_turnover / 1_000_000
+            
+            # Классификация по RSI
+            if current_rsi >= 70:
+                overbought_stocks.append((ticker, current_rsi, current_price, current_date, avg_turnover_mln))
+            elif current_rsi <= 30:
+                oversold_stocks.append((ticker, current_rsi, current_price, current_date, avg_turnover_mln))
+                
+        except Exception as e:
+            logger.error(f"Ошибка при анализе RSI для {ticker}: {e}")
+            continue
+    
+    # Сортируем списки
+    overbought_stocks.sort(key=lambda x: x[1], reverse=True)  # По убыванию RSI
+    oversold_stocks.sort(key=lambda x: x[1])                 # По возрастанию RSI
+    
+    # Формируем сообщение
+    msg = f"📊 RSI анализ на {datetime.now().strftime('%d.%m.%Y')}:\n\n"
+    
+    # 🔴 Перекупленные акции (RSI >= 70)
+    if overbought_stocks:
+        msg += "🔴 Топ 10 перекупленных акций (RSI ≥ 70):\n"
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Оборот':<8}  {'Дата':<8}\n"
+        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 8}  {'─' * 8}\n"
+        
+        for ticker, rsi_val, price, date, turnover in overbought_stocks[:10]:
+            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {turnover:6.0f}м  {date:<8}\n"
+        msg += "</pre>\n\n"
+    else:
+        msg += "🔴 Перекупленных акций (RSI ≥ 70) не найдено\n\n"
+    
+    # 🟢 Перепроданные акции (RSI <= 30)
+    if oversold_stocks:
+        msg += "🟢 Топ 10 перепроданных акций (RSI ≤ 30):\n"
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Оборот':<8}  {'Дата':<8}\n"
+        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 8}  {'─' * 8}\n"
+        
+        for ticker, rsi_val, price, date, turnover in oversold_stocks[:10]:
+            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {turnover:6.0f}м  {date:<8}\n"
+        msg += "</pre>\n\n"
+    else:
+        msg += "🟢 Перепроданных акций (RSI ≤ 30) не найдено\n\n"
+    
+    # Статистика
+    total_analyzed = len(overbought_stocks) + len(oversold_stocks)
+    msg += f"📈 Статистика:\n"
+    msg += f"• Всего акций в зонах экстремума: {total_analyzed}\n"
+    msg += f"• Перекупленных: {len(overbought_stocks)}\n"
+    msg += f"• Перепроданных: {len(oversold_stocks)}\n"
+    msg += f"• Фильтр по обороту: ≥50 млн ₽/день"
+    
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
+
 # === Новая команда: long_moneyflow ===
 def calculate_money_ad(df):
     df = df.copy()
@@ -377,6 +475,7 @@ if Update and ContextTypes:
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
             "/moneyflow - Топ по росту денежного потока (Money A/D)\n"
+            "/rsi_top — Топ 10 перекупленных и перепроданных акций по RSI\n"
         )
         await update.message.reply_text(text)
 
@@ -655,6 +754,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
+        app.add_handler(CommandHandler("rsi_top", rsi_top))
         app.add_handler(CallbackQueryHandler(handle_callback))
 
         # === Хендлер с диалогом выбора дней ===
