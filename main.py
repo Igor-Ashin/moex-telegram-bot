@@ -477,7 +477,8 @@ if Update and ContextTypes:
             "Команды:\n"
             "/chart_hv — выбрать акцию через кнопки\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
-            "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
+            "/stan_recent — акции с недавним пересечением SMA30 снизу вверх на дневном таймфрейме\n"
+            "/stan_recent_week — акции с недавним пересечением SMA30 снизу вверх на недельном таймфрейме\n"
             "/moneyflow - Топ по росту и оттоку денежного потока (Money A/D)\n"
             "/rsi_top — Топ 10 перекупленных и перепроданных акций по RSI\n"
         )
@@ -578,7 +579,64 @@ if Update and ContextTypes:
         except Exception as e:
             print(f"Ошибка при поиске пересечения SMA30 для {ticker}: {e}")
             return None  
+
+    def find_sma30_crossover_week(ticker, days=7):
+        """
+        Находит пересечение цены снизу вверх через SMA30 за последние дни
+        И проверяет, что на текущий момент цена находится выше SMA30
+        Возвращает дату пересечения или None
+        """
+        try:
+            dfd = get_moex_weekly_data(ticker, days=20)  # Берём больше данных для расчета среднего объема
+            if df.empty or len(df) < 15:  # Нужно минимум 15 дней для расчета среднего объема
+                return None
+
+            df = get_moex_data(ticker, weeks=60)  # Берём больше данных для расчета SMA30
+            if df.empty or len(df) < 35:  # Нужно минимум 35 недель для SMA30 + проверка
+                return None
+
+            # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
+            filter_turnover_series = dfd['volume'].iloc[-10:] * dfd['close'].iloc[-10:]
+            filter_avg_turnover = filter_turnover_series.mean()
             
+            # ❌ Фильтр по минимальному обороту: 50 млн руб за последние 10 дней
+            if filter_avg_turnover < 50_000_000:
+                return None  
+
+            
+            # Вычисляем SMA30
+            df['SMA30'] = df['close'].rolling(window=30).mean()
+            
+            # Проверяем, что текущая цена выше SMA30
+            current_close = df['close'].iloc[-1]
+            current_sma30 = df['SMA30'].iloc[-1]
+            
+            if current_close <= current_sma30:
+                return None  # Текущая цена не выше SMA30
+            
+            # Берём только последние days дней для поиска пересечений
+            recent_df = df.tail(weeks + 1)  # +1 для сравнения с предыдущим днём
+            
+            crossover_date = None
+            
+            # Ищем пересечение снизу вверх
+            for i in range(1, len(recent_df)):
+                prev_close = recent_df['close'].iloc[i-1]
+                curr_close = recent_df['close'].iloc[i]
+                prev_sma = recent_df['SMA30'].iloc[i-1]
+                curr_sma = recent_df['SMA30'].iloc[i]
+                
+                # Проверяем пересечение: вчера цена была ниже SMA30, сегодня выше
+                if (prev_close < prev_sma and curr_close > curr_sma):
+                    crossover_date = recent_df.index[i]
+                    break
+            
+            return crossover_date
+            
+        except Exception as e:
+            print(f"Ошибка при поиске пересечения SMA30 для {ticker}: {e}")
+            return None 
+    
     async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
         
@@ -613,6 +671,40 @@ if Update and ContextTypes:
         
         await update.message.reply_text(result_text)
 
+    async def stan_recent_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
+        
+        crossovers = []
+        all_tickers = sum(SECTORS.values(), [])
+        
+        # Проверяем каждый тикер
+        for ticker in all_tickers:
+            try:
+                crossover_date = find_sma30_crossover_week(ticker, weeks=5)
+                if crossover_date:
+                    crossovers.append((ticker, crossover_date))
+            except Exception as e:
+                print(f"Ошибка при анализе {ticker}: {e}")
+                continue
+        
+        if not crossovers:
+            await update.message.reply_text("📊 За последние 5 недель не найдено акций с пересечением цены через SMA30 снизу вверх.")
+            return
+        
+        # Сортируем по дате (от самого свежего к самому старому)
+        crossovers.sort(key=lambda x: x[1], reverse=True)
+        
+        # Формируем результат
+        result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 5 недель:\n\n"
+        
+        for ticker, date in crossovers:
+            formatted_date = date.strftime('%d.%m.%Y')
+            result_text += f"{ticker} {formatted_date}\n"
+        
+        result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
+        
+        await update.message.reply_text(result_text)
+    
     async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
@@ -757,6 +849,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("chart_hv", chart_hv))
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
+        app.add_handler(CommandHandler("stan_recent_week", stan_recent_week))
         app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
         app.add_handler(CommandHandler("rsi_top", rsi_top))
         app.add_handler(CallbackQueryHandler(handle_callback))
