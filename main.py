@@ -252,7 +252,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Изм. цены':<9}  {'Δ Потока':>17}  {'Δ / Оборот':>10}\n"
+        msg += f"{'Тикер':<6}  {'Изм. цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12}\n"
         # Убираем линию с дефисами, как просил
         for ticker, price_pct, ad_delta, _, _, delta_pct in result_up[:10]:
             msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_pct:9.1f}%\n"
@@ -262,7 +262,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Изм. цены':<9}  {'Δ Потока':>17}  {'Δ / Оборот':>10}\n"
+        msg += f"{'Тикер':<6}  {'Изм. цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12}\n"
         # Линию тоже убираем
         for ticker, price_pct, ad_delta, _, _, delta_pct in result_down[:10]:
             msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_pct:9.1f}%\n"
