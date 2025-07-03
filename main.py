@@ -387,10 +387,10 @@ if Update and ContextTypes:
     async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
         await update.message.reply_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
-"""
+
     async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Начинаю анализ всех акций. Это может занять некоторое время...")
-"""        
+        
         for ticker in sum(SECTORS.values(), []):
             try:
                 df = get_moex_data(ticker)
