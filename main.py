@@ -41,6 +41,8 @@ SECTORS = {
 TICKERS_PER_PAGE = 10
 
 ASK_DAYS = 1  # состояние для выбора дней
+ASK_TICKER = 2
+ASK_DELTA_DAYS = 3
 
 async def ask_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📅 Введите количество дней для расчета дельты денежного потока (например, 10):")
@@ -59,6 +61,107 @@ async def receive_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("⚠️ Введите целое число, например: 10")
         return ASK_DAYS
+
+# Добавьте эти функции после функции receive_days:
+
+async def ask_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Запрашивает тикер у пользователя"""
+    await update.message.reply_text("📊 Введите тикер акции (например, SBER):")
+    return ASK_TICKER
+
+async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Получает тикер и запрашивает количество дней"""
+    ticker = update.message.text.strip().upper()
+    
+    # Проверяем, что тикер существует в наших секторах
+    all_tickers = sum(SECTORS.values(), [])
+    if ticker not in all_tickers:
+        await update.message.reply_text(f"⚠️ Тикер '{ticker}' не найден в базе данных. Проверьте правильность написания.")
+        return ASK_TICKER
+    
+    context.user_data['delta_ticker'] = ticker
+    await update.message.reply_text(f"✅ Вы ввели тикер: {ticker}\n\n📅 Введите количество дней для расчета дельты денежного потока (например, 10):")
+    return ASK_DELTA_DAYS
+
+async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Получает количество дней и выполняет расчет дельты"""
+    try:
+        days = int(update.message.text)
+        if not (1 <= days <= 60):
+            await update.message.reply_text("⚠️ Введите число от 1 до 60.")
+            return ASK_DELTA_DAYS
+
+        ticker = context.user_data['delta_ticker']
+        await calculate_single_delta(update, context, ticker, days)
+        return ConversationHandler.END
+    except ValueError:
+        await update.message.reply_text("⚠️ Введите целое число, например: 10")
+        return ASK_DELTA_DAYS
+
+async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_TYPE, ticker: str, days: int):
+    """Рассчитывает дельту денежного потока для одной акции"""
+    await update.message.reply_text(f"🔍 Рассчитываю дельту денежного потока для {ticker} за {days} дней...")
+    
+    try:
+        df = get_moex_data(ticker, days=days + 5)  # с запасом
+        if df.empty or len(df) < days + 1:
+            await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте уменьшить количество дней.")
+            return
+
+        df = df.rename(columns={'close': 'close', 'volume': 'volume'})
+        df = calculate_money_ad(df)
+
+        ad_start = df['money_ad'].iloc[-(days+1)]
+        ad_end = df['money_ad'].iloc[-1]
+        ad_delta = ad_end - ad_start
+
+        price_start = df['close'].iloc[-(days+1)]
+        price_end = df['close'].iloc[-1]
+        date_start = df.index[-(days+1)].strftime('%d.%m.%y')
+        date_end = df.index[-1].strftime('%d.%m.%y')
+        
+        price_delta = price_end - price_start
+        price_pct = 100 * price_delta / price_start
+
+        # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
+        filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
+        filter_avg_turnover = filter_turnover_series.mean()
+        
+        # 💰 Среднедневной денежный оборот за период
+        turnover_series = df['volume'].iloc[-days:] * df['close'].iloc[-days:]
+        avg_turnover = turnover_series.mean()
+        
+        # 📊 Отношение дельты потока к обороту (%)
+        if avg_turnover != 0:
+            delta_vs_turnover = 100 * ad_delta / avg_turnover
+        else:
+            delta_vs_turnover = 0
+
+        # Формируем сообщение
+        msg = f"📊 Анализ дельты денежного потока для {ticker}\n"
+        msg += f"📅 Период: {date_start} – {date_end} ({days} дней)\n\n"
+        
+        # Добавляем предупреждение о низком обороте
+        if filter_avg_turnover < 50_000_000:
+            msg += "⚠️ Внимание: низкий среднедневной оборот (< 50 млн ₽)\n\n"
+        
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}  {'Изм. цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12}\n"
+        msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_vs_turnover:9.1f}%\n"
+        msg += "</pre>\n\n"
+        
+        # Добавляем интерпретацию результатов
+        if ad_delta > 0:
+            msg += "📈 Положительная дельта потока - деньги притекают в акцию\n"
+        else:
+            msg += "📉 Отрицательная дельта потока - деньги оттекают из акции\n"
+        
+        msg += f"💰 Среднедневной оборот: {avg_turnover/1_000_000:.1f} млн ₽"
+        
+        await update.message.reply_text(msg, parse_mode="HTML")
+        
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при расчете дельты для {ticker}: {str(e)}")
 
 # RSI TOP
 async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -480,6 +583,7 @@ if Update and ContextTypes:
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх на дневном таймфрейме\n"
             "/stan_recent_week — акции с недавним пересечением SMA30 снизу вверх на недельном таймфрейме\n"
             "/moneyflow - Топ по росту и оттоку денежного потока (Money A/D)\n"
+            "/delta — расчет дельты денежного потока для конкретной акции\n"
             "/rsi_top — Топ 10 перекупленных и перепроданных акций по RSI\n"
         )
         await update.message.reply_text(text)
@@ -853,6 +957,15 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
         app.add_handler(CommandHandler("rsi_top", rsi_top))
         app.add_handler(CallbackQueryHandler(handle_callback))
+        delta_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("delta", ask_ticker)],
+        states={
+            ASK_TICKER: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticker)],
+            ASK_DELTA_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_delta_days)]
+        },
+        fallbacks=[],
+    )
+    app.add_handler(delta_conv_handler)
 
         # === Хендлер с диалогом выбора дней ===
         conv_handler = ConversationHandler(
