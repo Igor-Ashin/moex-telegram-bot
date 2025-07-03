@@ -374,7 +374,6 @@ if Update and ContextTypes:
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
             "Команды:\n"
             "/chart_hv — выбрать акцию через кнопки\n"
-            "/all — анализ голубых фишек Мосбиржи\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
             "/moneyflow - Топ по росту денежного потока (Money A/D)\n"
@@ -388,7 +387,7 @@ if Update and ContextTypes:
     async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
         await update.message.reply_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
-
+"""
     async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Начинаю анализ всех акций. Это может занять некоторое время...")
         
@@ -423,7 +422,7 @@ if Update and ContextTypes:
                     
             except Exception as e:
                 await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
-
+"""
     def find_sma30_crossover(ticker, days=7):
         """
         Находит пересечение цены снизу вверх через SMA30 за последние дни
@@ -653,7 +652,7 @@ if ApplicationBuilder:
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("chart_hv", chart_hv))
-        app.add_handler(CommandHandler("all", all))  # Используем функцию all
+       # app.add_handler(CommandHandler("all", all))  # Используем функцию all
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
