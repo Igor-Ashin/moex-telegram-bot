@@ -373,14 +373,14 @@ if Update and ContextTypes:
         text = (
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
             "Команды:\n"
-            "/chart_hv — выбрать акцию через кнопки\n"
+            "/a — выбрать акцию через кнопки\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/stan_recent — акции с недавним пересечением SMA30 снизу вверх\n"
             "/moneyflow - Топ по росту денежного потока (Money A/D)\n"
         )
         await update.message.reply_text(text)
 
-    async def chart_hv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def a(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
         await update.message.reply_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -651,7 +651,7 @@ if ApplicationBuilder:
         keep_alive()  # ← запуск Flask
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("chart_hv", chart_hv))
+        app.add_handler(CommandHandler("a", a))
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
