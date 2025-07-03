@@ -60,7 +60,7 @@ async def receive_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Введите целое число, например: 10")
         return ASK_DAYS
 
-
+# RSI TOP
 async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Команда для показа топ 10 перекупленных и топ 10 перепроданных акций по RSI
@@ -96,18 +96,22 @@ async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if pd.isna(current_rsi):
                 continue
                 
-            # Текущая цена и дата
+            # Текущая цена и изменение за день
             current_price = df['close'].iloc[-1]
-            current_date = df.index[-1].strftime('%d.%m.%y')
+            prev_price = df['close'].iloc[-2] if len(df) >= 2 else current_price
+            price_change = current_price - prev_price
+            price_change_pct = (price_change / prev_price * 100) if prev_price != 0 else 0
             
-            # Среднедневной оборот для отображения
-            avg_turnover_mln = filter_avg_turnover / 1_000_000
+            # Относительный объем (текущий объем к среднему за 10 дней)
+            current_volume = df['volume'].iloc[-1]
+            avg_volume = df['volume'].iloc[-10:].mean()
+            relative_volume_pct = (current_volume / avg_volume * 100) if avg_volume != 0 else 100
             
             # Классификация по RSI
             if current_rsi >= 70:
-                overbought_stocks.append((ticker, current_rsi, current_price, current_date, avg_turnover_mln))
+                overbought_stocks.append((ticker, current_rsi, current_price, price_change_pct, relative_volume_pct))
             elif current_rsi <= 30:
-                oversold_stocks.append((ticker, current_rsi, current_price, current_date, avg_turnover_mln))
+                oversold_stocks.append((ticker, current_rsi, current_price, price_change_pct, relative_volume_pct))
                 
         except Exception as e:
             logger.error(f"Ошибка при анализе RSI для {ticker}: {e}")
@@ -118,17 +122,17 @@ async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     oversold_stocks.sort(key=lambda x: x[1])                 # По возрастанию RSI
     
     # Формируем сообщение
-    msg = f"📊 RSI анализ на {datetime.now().strftime('%d.%m.%Y')}:\n\n"
+    msg = f"📊 RSI анализ на {datetime.now().strftime('%d.%m.%Y %H:%M')}:\n\n"
     
     # 🔴 Перекупленные акции (RSI >= 70)
     if overbought_stocks:
         msg += "🔴 Топ 10 перекупленных акций (RSI ≥ 70):\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Оборот':<8}  {'Дата':<8}\n"
-        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 8}  {'─' * 8}\n"
+        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Изм %':<7}  {'Отн.об %':<8}\n"
+        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 7}  {'─' * 8}\n"
         
-        for ticker, rsi_val, price, date, turnover in overbought_stocks[:10]:
-            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {turnover:6.0f}м  {date:<8}\n"
+        for ticker, rsi_val, price, price_change_pct, rel_volume in overbought_stocks[:10]:
+            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {price_change_pct:+6.1f}%  {rel_volume:7.0f}%\n"
         msg += "</pre>\n\n"
     else:
         msg += "🔴 Перекупленных акций (RSI ≥ 70) не найдено\n\n"
@@ -137,11 +141,11 @@ async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if oversold_stocks:
         msg += "🟢 Топ 10 перепроданных акций (RSI ≤ 30):\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Оборот':<8}  {'Дата':<8}\n"
-        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 8}  {'─' * 8}\n"
+        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Изм %':<7}  {'Отн.об %':<8}\n"
+        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 7}  {'─' * 8}\n"
         
-        for ticker, rsi_val, price, date, turnover in oversold_stocks[:10]:
-            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {turnover:6.0f}м  {date:<8}\n"
+        for ticker, rsi_val, price, price_change_pct, rel_volume in oversold_stocks[:10]:
+            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {price_change_pct:+6.1f}%  {rel_volume:7.0f}%\n"
         msg += "</pre>\n\n"
     else:
         msg += "🟢 Перепроданных акций (RSI ≤ 30) не найдено\n\n"
