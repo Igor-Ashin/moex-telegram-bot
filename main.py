@@ -958,14 +958,14 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("rsi_top", rsi_top))
         app.add_handler(CallbackQueryHandler(handle_callback))
         delta_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("delta", ask_ticker)],
-        states={
-            ASK_TICKER: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticker)],
-            ASK_DELTA_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_delta_days)]
-        },
-        fallbacks=[],
-    )
-    app.add_handler(delta_conv_handler)
+        entry_points=[CommandHandler("delta", ask_ticker)],
+            states={
+                ASK_TICKER: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticker)],
+                ASK_DELTA_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_delta_days)]
+            },
+            fallbacks=[],
+        )
+        app.add_handler(delta_conv_handler)
 
         # === Хендлер с диалогом выбора дней ===
         conv_handler = ConversationHandler(
