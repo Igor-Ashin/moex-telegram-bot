@@ -95,6 +95,15 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             price_delta = price_end - price_start
             price_pct = 100 * price_delta / price_start
+
+            # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
+            filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
+            filter_avg_turnover = filter_turnover_series.mean()
+            
+            # ❌ Фильтр по минимальному обороту: 50 млн руб за последние 10 дней
+            if filter_avg_turnover < 50_000_000:
+                continue
+                
             # 💰 Среднедневной денежный оборот за период
             turnover_series = df['volume'].iloc[-days:] * df['close'].iloc[-days:]
             avg_turnover = turnover_series.mean()
@@ -425,6 +434,15 @@ if Update and ContextTypes:
             df = get_moex_data(ticker, days=60)  # Берём больше данных для расчета SMA30
             if df.empty or len(df) < 35:  # Нужно минимум 35 дней для SMA30 + проверка
                 return None
+
+            # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
+            filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
+            filter_avg_turnover = filter_turnover_series.mean()
+            
+            # ❌ Фильтр по минимальному обороту: 50 млн руб за последние 10 дней
+            if filter_avg_turnover < 50_000_000:
+                return None  
+
             
             # Вычисляем SMA30
             df['SMA30'] = df['close'].rolling(window=30).mean()
