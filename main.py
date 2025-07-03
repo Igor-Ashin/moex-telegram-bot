@@ -390,7 +390,7 @@ if Update and ContextTypes:
 """
     async def all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Начинаю анализ всех акций. Это может занять некоторое время...")
-        
+"""        
         for ticker in sum(SECTORS.values(), []):
             try:
                 df = get_moex_data(ticker)
@@ -422,7 +422,7 @@ if Update and ContextTypes:
                     
             except Exception as e:
                 await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
-"""
+
     def find_sma30_crossover(ticker, days=7):
         """
         Находит пересечение цены снизу вверх через SMA30 за последние дни
@@ -652,7 +652,6 @@ if ApplicationBuilder:
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("chart_hv", chart_hv))
-       # app.add_handler(CommandHandler("all", all))  # Используем функцию all
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
