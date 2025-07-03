@@ -320,7 +320,7 @@ def plot_stock(df, ticker, levels=[], patterns=[]):
     
     try:
         plt.figure(figsize=(12, 6))
-        plt.plot(df.index, df['close'], label='Цена')
+        plt.plot(df.index, df['close'], label='Цена', color='blue')
 
         plt.plot(df.index, df['EMA9'], label='EMA9', linestyle='--', alpha=0.7)
         plt.plot(df.index, df['EMA20'], label='EMA20', linestyle='--', alpha=0.7)
