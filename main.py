@@ -73,8 +73,8 @@ async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проходим по всем тикерам
     for ticker in sum(SECTORS.values(), []):
         try:
-            # Получаем данные за последние 30 дней (с запасом для RSI)
-            df = get_moex_data(ticker, days=30)
+            # Получаем данные за последние 100 дней (с запасом для RSI)
+            df = get_moex_data(ticker, days=100)
             if df.empty or len(df) < 15:  # Минимум 15 дней для корректного RSI
                 continue
             
