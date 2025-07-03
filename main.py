@@ -580,7 +580,7 @@ if Update and ContextTypes:
             print(f"Ошибка при поиске пересечения SMA30 для {ticker}: {e}")
             return None  
 
-    def find_sma30_crossover_week(ticker, days=7):
+    def find_sma30_crossover_week(ticker, weeks=5):
         """
         Находит пересечение цены снизу вверх через SMA30 за последние дни
         И проверяет, что на текущий момент цена находится выше SMA30
