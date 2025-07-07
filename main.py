@@ -129,7 +129,7 @@ async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # SMA30 Weekly
             try:
-                wdf = get_moex_weekly_data(ticker, weeks=35)  # Больше недель для SMA30
+                wdf = get_moex_weekly_data(ticker, weeks=80)  # Больше недель для SMA30
                 if len(wdf) >= 30:
                     wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
                     weekly_sma30 = wdf['SMA30'].iloc[-1]
@@ -472,6 +472,10 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df = get_moex_data(ticker, days=days + 5)  # с запасом
             if df.empty or len(df) < days + 1:
                 continue
+                
+            dfall = get_moex_data(ticker, days=100)  # с запасом
+            if df.empty or len(df) < 20:
+                continue
 
             df = df.rename(columns={'close': 'close', 'volume': 'volume'})  # если еще не переименовано
             df = calculate_money_ad(df)
@@ -509,12 +513,12 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
 
             # EMA20/EMA50 Daily
-            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
-            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+            dfall['EMA20'] = dfall['close'].ewm(span=20, adjust=False).mean()
+            dfall['EMA50'] = dfall['close'].ewm(span=50, adjust=False).mean()
             
-            current_ema20 = df['EMA20'].iloc[-1]
-            current_ema50 = df['EMA50'].iloc[-1]
-            current_price = df['close'].iloc[-1]
+            current_ema20 = dfall['EMA20'].iloc[-1]
+            current_ema50 = dfall['EMA50'].iloc[-1]
+            current_price = dfall['close'].iloc[-1]
             
             # Условие для лонг сигнала EMA20x50
             ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
@@ -524,7 +528,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # SMA30 Weekly
             try:
-                wdf = get_moex_weekly_data(ticker, weeks=50)  # Больше недель для SMA30
+                wdf = get_moex_weekly_data(ticker, weeks=80)  # Больше недель для SMA30
                 if len(wdf) >= 30:
                     wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
                     weekly_sma30 = wdf['SMA30'].iloc[-1]
@@ -605,7 +609,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # Получение данных для Штейн
-def get_moex_weekly_data(ticker="SBER", weeks=100):
+def get_moex_weekly_data(ticker="SBER", weeks=80):
     try:
         till = datetime.today().strftime('%Y-%m-%d')
         from_date = (datetime.today() - pd.Timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
