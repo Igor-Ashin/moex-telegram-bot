@@ -552,7 +552,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     round(ad_delta, 2),
                     date_start,
                     date_end,
-                    round(delta_vs_turnover, 2)
+                    round(delta_vs_turnover, 2),
                     price_change, 
                     ratio, 
                     ema20x50_long, 
