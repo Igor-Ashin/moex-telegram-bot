@@ -51,8 +51,8 @@ async def ask_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def receive_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         days = int(update.message.text)
-        if not (1 <= days <= 60):
-            await update.message.reply_text("⚠️ Введите число от 1 до 30.")
+        if not (1 <= days <= 100):
+            await update.message.reply_text("⚠️ Введите число от 1 до 100.")
             return ASK_DAYS
 
         context.user_data['days'] = days
