@@ -98,8 +98,8 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
             
-            # Получаем данные за последние 8 дней для анализа
-            recent = df.tail(15)  # 7 дней + текущий
+            # Получаем данные за последние 15 дней для анализа
+            recent = df.tail(15)  # 14 дней + текущий
             
             # Текущие значения
             current_close = df['close'].iloc[-1]
@@ -112,6 +112,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 prev_ema50 = recent['EMA50'].iloc[i-1]
                 curr_ema20 = recent['EMA20'].iloc[i]
                 curr_ema50 = recent['EMA50'].iloc[i]
+                curr_close = recent['close'].iloc[i]  # Цена в день пересечения
                 
                 # Получаем дату для текущего дня
                 date = recent.index[i].strftime('%d.%m.%Y')
@@ -161,7 +162,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
-
+    
 async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получает количество дней и выполняет расчет дельты"""
     try:
