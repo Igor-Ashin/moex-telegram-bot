@@ -91,8 +91,8 @@ async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for ticker in sum(SECTORS.values(), []):
         try:
             # Получаем дневные данные (больше дней для качественного расчета EMA)
-            df = get_moex_data(ticker, days=60)  # Для качественного расчета EMA50
-            if df.empty or len(df) < 11: 
+            df = get_moex_data(ticker, days=100)  # Для качественного расчета EMA50
+            if df.empty or len(df) < 60: 
                 continue
                 
             # Расчёт среднего оборота за 10 дней (исключая сегодня)
@@ -139,6 +139,13 @@ async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     price_above_sma30 = False
             except:
                 price_above_sma30 = False
+
+
+                        # === MONEY FLOW A/D ===
+            money_df = calculate_money_ad(df)
+            ad_delta = money_df['money_ad'].iloc[-1] - money_df['money_ad'].iloc[-11]
+            money_flow_icon = "🟢" if ad_delta > 0 else "🔴"
+            money_flow_str = f"{ad_delta/1_000_000:+.0f}M"
             
             rows.append((
                 ticker, 
@@ -146,7 +153,9 @@ async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 price_change, 
                 ratio, 
                 ema20x50_long, 
-                price_above_sma30
+                price_above_sma30,
+                money_flow_icon,
+                money_flow_str
             ))
             
         except Exception as e:
@@ -166,18 +175,19 @@ async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Формируем таблицу
     msg = "📊 <b>Акции с повышенным объёмом</b>\n\n"
     msg += "<pre>"
-    msg += f"{'Тикер':<6} {'Цена':>8} {'Δ дня':>8} {'Объём':>7} {'EMA':>3} {'SMA':>3}\n"
-    msg += "-" * 50 + "\n"
+    msg += f"{'Тикер':<6} {'Цена':>8} {'Δ дня':>7} {'Объём':>6} {'EMA':>3} {'SMA':>3} {'Деньги':>8}\n"
+    msg += "-" * 60 + "\n"
     
-    for ticker, price, delta, ratio, ema_signal, sma_signal in rows:
+    for ticker, price, delta, ratio, ema_signal, sma_signal, mf_icon, mf_str in rows:
         ema_icon = "🟢" if ema_signal else "🔴"
         sma_icon = "🟢" if sma_signal else "🔴"
         
-        msg += f"{ticker:<6} {price:>8.2f} {delta*100:>7.1f}% {ratio:>6.1f}x {ema_icon:>3} {sma_icon:>3}\n"
+        msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>3} {sma_icon:>3} {mf_icon}{mf_str:>6}\n"
     
     msg += "</pre>\n\n"
     msg += "<i>🟢 EMA20x50 (D) - лонг сигнал на дневном ТФ</i>\n"
-    msg += "<i>🟢 Цена x SMA30 (W) - цена выше SMA30 на недельном ТФ</i>"
+    msg += "<i>🟢 Цена x SMA30 (W) - цена выше SMA30 на недельном ТФ</i>\n"
+    msg += "<i>🟢 MoneyFlow - приток денежных средств (посл. 3 дня)</i>"
     
     await update.message.reply_text(msg, parse_mode="HTML")
 
