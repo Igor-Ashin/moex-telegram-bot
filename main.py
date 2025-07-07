@@ -148,13 +148,13 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = ""
     if long_hits:
         msg += f"🟢 *Лонг пересечение EMA20×50 за последние 7 дней, всего: {len(long_hits)}:*\n"
-        msg += " ".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
+        msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
     else:
         msg += "🟢 *Лонг сигналов не найдено за последние 7 дней*\n\n"
         
     if short_hits:
         msg += f"🔴 *Шорт пересечение EMA20×50 за последние 7 дней, всего: {len(short_hits)}:*\n"
-        msg += " ".join(f"{t} {d}" for t, d in short_hits)
+        msg += "\n".join(f"{t} {d}" for t, d in short_hits)
     else:
         msg += "🔴 *Шорт сигналов не найдено за последние 7 дней*"
     
