@@ -643,6 +643,7 @@ if Update and ContextTypes:
             "Команды:\n"
             "/chart_hv — выбрать акцию через кнопки\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
+            "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
             "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
             "/stan_recent_short — акции с шорт пересечением SMA30 на 1D\n"
             "/stan_recent_week — акции с лонг пересечением SMA30 на 1W\n"
