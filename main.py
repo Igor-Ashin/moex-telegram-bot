@@ -175,14 +175,14 @@ async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Формируем таблицу
     msg = "📊 <b>Акции с повышенным объёмом</b>\n\n"
     msg += "<pre>"
-    msg += f"{'Тикер':<6} {'Цена':>8} {'Δ Цены':>7} {'Объём':>6} {'ema20x50':>6} {'sma30':>6} {'Δ Потока':>8}\n"
+    msg += f"{'Тикер':<6} {'Цена':>8} {'Δ Цены':>7} {'Объём':>6} {'ema20x50':>6} {'sma30':>6} {'Δ Потока':>10}\n"
     msg += "-" * 60 + "\n"
     
     for ticker, price, delta, ratio, ema_signal, sma_signal, mf_icon, mf_str in rows:
         ema_icon = "🟢" if ema_signal else "🔴"
         sma_icon = "🟢" if sma_signal else "🔴"
         
-        msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>6} {sma_icon:>6} {mf_icon}{mf_str:>6}\n"
+        msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>6} {sma_icon:>4} {mf_icon}{mf_str:>6}\n"
     
     msg += "</pre>\n\n"
     msg += "<i>EMA - пересечение EMA20x50 (D) на дневном ТФ</i>\n"
@@ -334,7 +334,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         
         msg += "<pre>\n"
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>19}  {'Δ/Оборот':>12}\n"
-        msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_vs_turnover:9.1f}%\n"
+        msg += f"{ticker:<6}  {price_pct:+8.1f}%  {ad_delta/1_000_000:13,.0f} млн ₽  {delta_vs_turnover:9.1f}%\n"
         msg += "</pre>\n\n"
         
         # Добавляем интерпретацию результатов
@@ -581,22 +581,22 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>17}  {'Δ / Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
         # Убираем линию с дефисами, как просил
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_up[:10]:
             ema_icon = "🟢" if ema_signal else "🔴"
             sma_icon = "🟢" if sma_signal else "🔴"
-            msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_pct:9.1f}%  {price_change_day*100:>6.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>6}\n"
+            msg += f"{ticker:<6}  {price_pct:+6.1f}%  {ad_delta/1_000_000:13,.0f} млн ₽  {delta_pct:11.1f}%  {price_change_day*100:>7.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
     
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>17}  {'Δ / Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
         # Линию тоже убираем
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_down[:10]:
-            msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_pct:9.1f}%  {price_change_day*100:>6.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>6}\n"
+            msg += f"{ticker:<6}  {price_pct:+6.1f}%  {ad_delta/1_000_000:13,.0f} млн ₽  {delta_pct:11.1f}%  {price_change_day*100:>7.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
         msg += "</pre>\n"
     
     await update.message.reply_text(msg, parse_mode="HTML")
