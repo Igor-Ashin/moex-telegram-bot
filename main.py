@@ -91,8 +91,8 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data(ticker, days=60)  # достаточно для расчета EMA
-            if df.empty or len(df) < 60:
+            df = get_moex_data(ticker, days=100)  # достаточно для расчета EMA
+            if df.empty or len(df) < 100:
                 continue
                 
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
@@ -120,6 +120,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if (
                     prev_ema20 <= prev_ema50
                     and curr_ema20 > curr_ema50
+                    and curr_close > curr_ema20
                     and current_close > current_ema20
                     and current_ema20 > current_ema50
                 ):
@@ -130,6 +131,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 elif (
                     prev_ema20 >= prev_ema50
                     and curr_ema20 < curr_ema50
+                    and curr_close < curr_ema20
                     and current_close < current_ema20
                     and current_ema20 < current_ema50
                 ):
