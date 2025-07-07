@@ -83,6 +83,69 @@ async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Вы ввели тикер: {ticker}\n\n📅 Введите количество дней для расчета дельты денежного потока (например, 10):")
     return ASK_DELTA_DAYS
 
+
+async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 7 дней...")
+    long_hits, short_hits = [], []
+    today = datetime.today().date()
+
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            df = get_moex_data(ticker, days=60)  # достаточно для расчета EMA
+            if df.empty or len(df) < 60:
+                continue
+            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+            recent = df.tail(8)  # 7 дней + текущий
+
+            # Текущие значения
+            current_close = df['close'].iloc[-1]
+            current_ema20 = df['EMA20'].iloc[-1]
+            current_ema50 = df['EMA50'].iloc[-1]
+            
+            # Лонг пересечение: снизу вверх + подтверждение
+                if (
+                    prev['EMA20'] <= prev['EMA50']
+                    and curr['EMA20'] > curr['EMA50']
+                    and current_close > current_ema20
+                    and current_ema20 > current_ema50
+                ):
+                    long_hits.append((ticker, date))
+                    break  # Только одно пересечение за период
+
+                # Шорт пересечение: сверху вниз + подтверждение
+                elif (
+                    prev['EMA20'] >= prev['EMA50']
+                    and curr['EMA20'] < curr['EMA50']
+                    and current_close < current_ema20
+                    and current_ema20 < current_ema50
+                ):
+                    short_hits.append((ticker, date))
+                    break  # Только одно пересечение за период
+        except Exception as e:
+            print(f"Ошибка EMA для {ticker}: {e}")
+            continue
+
+    # Сортировка по дате (новые вверх)
+    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+    short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+
+    # Формируем сообщение
+    msg = ""
+    if long_hits:
+        msg += f"🟢 *Лонг пересечение EMA20×50 за последние 7 дней, всего: {len(long_hits)}:*\n"
+        msg += " ".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
+    else:
+        msg += "🟢 *Лонг сигналов не найдено за последние 7 дней*\n\n"
+
+    if short_hits:
+        msg += f"🔴 *Шорт пересечение EMA20×50 за последние 7 дней, всего: {len(short_hits)}:*\n"
+        msg += " ".join(f"{t} {d}" for t, d in short_hits)
+    else:
+        msg += "🔴 *Шорт сигналов не найдено за последние 7 дней*"
+
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
 async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получает количество дней и выполняет расчет дельты"""
     try:
@@ -580,9 +643,9 @@ if Update and ContextTypes:
             "Команды:\n"
             "/chart_hv — выбрать акцию через кнопки\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
-            "/stan_recent — акции с недавним пересечением SMA30 снизу вверх на дневном таймфрейме\n"
-            "/stan_recent_short — акции с недавним пересечением SMA30 снизу вверх на дневном таймфрейме\n"
-            "/stan_recent_week — акции с недавним пересечением SMA30 снизу вверх на недельном таймфрейме\n"
+            "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
+            "/stan_recent_short — акции с шорт пересечением SMA30 на 1D\n"
+            "/stan_recent_week — акции с лонг пересечением SMA30 на 1W\n"
             "/moneyflow - Топ по росту и оттоку денежного потока (Money A/D)\n"
             "/delta — расчет дельты денежного потока для конкретной акции\n"
             "/rsi_top — Топ 10 перекупленных и перепроданных акций по RSI\n"
@@ -1041,6 +1104,7 @@ if ApplicationBuilder:
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("chart_hv", chart_hv))
+        app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
