@@ -175,14 +175,14 @@ async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Формируем таблицу
     msg = "📊 <b>Акции с повышенным объёмом</b>\n\n"
     msg += "<pre>"
-    msg += f"{'Тикер':<6} {'Цена':>8} {'Δ Цены':>7} {'Объём':>6} {'EMA 20х50':>3} {'SMA30':>3} {'Δ Потока':>8}\n"
+    msg += f"{'Тикер':<6} {'Цена':>8} {'Δ Цены':>7} {'Объём':>6} {'ema20x50':>6} {'sma30':>6} {'Δ Потока':>8}\n"
     msg += "-" * 60 + "\n"
     
     for ticker, price, delta, ratio, ema_signal, sma_signal, mf_icon, mf_str in rows:
         ema_icon = "🟢" if ema_signal else "🔴"
         sma_icon = "🟢" if sma_signal else "🔴"
         
-        msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>3} {sma_icon:>3} {mf_icon}{mf_str:>6}\n"
+        msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>6} {sma_icon:>6} {mf_icon}{mf_str:>6}\n"
     
     msg += "</pre>\n\n"
     msg += "<i>EMA - пересечение EMA20x50 (D) на дневном ТФ</i>\n"
@@ -500,6 +500,41 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             turnover_series = df['volume'].iloc[-days:] * df['close'].iloc[-days:]
             avg_turnover = turnover_series.mean()
             
+            # Сегодняшний оборот
+            today_volume = df['volume'].iloc[-1]
+            today_close = df['close'].iloc[-1]
+            today_turnover = today_volume * today_close
+            
+            # Коэффициент превышения объёма
+            ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
+
+            # EMA20/EMA50 Daily
+            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+            
+            current_ema20 = df['EMA20'].iloc[-1]
+            current_ema50 = df['EMA50'].iloc[-1]
+            current_price = df['close'].iloc[-1]
+            
+            # Условие для лонг сигнала EMA20x50
+            ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
+
+            # Изменение цены за день
+            price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
+
+            # SMA30 Weekly
+            try:
+                wdf = get_moex_weekly_data(ticker, weeks=50)  # Больше недель для SMA30
+                if len(wdf) >= 30:
+                    wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
+                    weekly_sma30 = wdf['SMA30'].iloc[-1]
+                    weekly_price = wdf['close'].iloc[-1]
+                    price_above_sma30 = weekly_price > weekly_sma30 if pd.notna(weekly_sma30) else False
+                else:
+                    price_above_sma30 = False
+            except:
+                price_above_sma30 = False
+            
             # 📊 Отношение дельты потока к обороту (%)
             if avg_turnover != 0:
                 delta_vs_turnover = 100 * ad_delta / avg_turnover
@@ -518,6 +553,10 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     date_start,
                     date_end,
                     round(delta_vs_turnover, 2)
+                    price_change, 
+                    ratio, 
+                    ema20x50_long, 
+                    price_above_sma30,
     ))
         except Exception as e:
             print(f"Ошибка Money A/D для {ticker}: {e}")
@@ -542,20 +581,22 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Изм. цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
         # Убираем линию с дефисами, как просил
-        for ticker, price_pct, ad_delta, _, _, delta_pct in result_up[:10]:
-            msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_pct:9.1f}%\n"
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_up[:10]:
+            ema_icon = "🟢" if ema_signal else "🔴"
+            sma_icon = "🟢" if sma_signal else "🔴"
+            msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_pct:9.1f}%  {price_change_day*100:>6.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>6}\n"
         msg += "</pre>\n\n"
     
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Изм. цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>19}  {'Δ / Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
         # Линию тоже убираем
-        for ticker, price_pct, ad_delta, _, _, delta_pct in result_down[:10]:
-            msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_pct:9.1f}%\n"
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_down[:10]:
+            msg += f"{ticker:<6}  {price_pct:+8.2f}%  {ad_delta/1_000_000:13,.2f} млн ₽  {delta_pct:9.1f}%  {price_change_day*100:>6.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>6}\n"
         msg += "</pre>\n"
     
     await update.message.reply_text(msg, parse_mode="HTML")
