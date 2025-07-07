@@ -84,6 +84,103 @@ async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_DELTA_DAYS
 
 
+async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу акции с повышенным объёмом…")
+    rows = []
+    
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            # Получаем дневные данные (больше дней для качественного расчета EMA)
+            df = get_moex_data(ticker, days=60)  # Для качественного расчета EMA50
+            if df.empty or len(df) < 11: 
+                continue
+                
+            # Расчёт среднего оборота за 10 дней (исключая сегодня)
+            volume_series = df['volume'].iloc[-11:-1]  # Последние 10 дней без сегодня
+            close_series = df['close'].iloc[-11:-1]
+            turnover_series = volume_series * close_series
+            avg_turnover = turnover_series.mean()
+            
+            # Сегодняшний оборот
+            today_volume = df['volume'].iloc[-1]
+            today_close = df['close'].iloc[-1]
+            today_turnover = today_volume * today_close
+            
+            # Коэффициент превышения объёма
+            ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
+            
+            # Фильтр: показываем только акции с повышенным объёмом (>1.2x)
+            if ratio < 1.2:
+                continue
+                
+            # EMA20/EMA50 Daily
+            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+            
+            current_ema20 = df['EMA20'].iloc[-1]
+            current_ema50 = df['EMA50'].iloc[-1]
+            current_price = df['close'].iloc[-1]
+            
+            # Условие для лонг сигнала EMA20x50
+            ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
+            
+            # Изменение цены за день
+            price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
+            
+            # SMA30 Weekly
+            try:
+                wdf = get_moex_weekly_data(ticker, weeks=35)  # Больше недель для SMA30
+                if len(wdf) >= 30:
+                    wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
+                    weekly_sma30 = wdf['SMA30'].iloc[-1]
+                    weekly_price = wdf['close'].iloc[-1]
+                    price_above_sma30 = weekly_price > weekly_sma30 if pd.notna(weekly_sma30) else False
+                else:
+                    price_above_sma30 = False
+            except:
+                price_above_sma30 = False
+            
+            rows.append((
+                ticker, 
+                current_price, 
+                price_change, 
+                ratio, 
+                ema20x50_long, 
+                price_above_sma30
+            ))
+            
+        except Exception as e:
+            print(f"Ошибка для {ticker}: {e}")
+            continue
+    
+    # Сортировка по коэффициенту объёма (убывание)
+    rows.sort(key=lambda x: x[3], reverse=True)
+    
+    # Берём топ-15 акций
+    rows = rows[:15]
+    
+    if not rows:
+        await update.message.reply_text("📊 Акций с повышенным объёмом не найдено")
+        return
+    
+    # Формируем таблицу
+    msg = "📊 <b>Акции с повышенным объёмом</b>\n\n"
+    msg += "<pre>"
+    msg += f"{'Тикер':<6} {'Цена':>8} {'Δ дня':>8} {'Объём':>7} {'EMA':>3} {'SMA':>3}\n"
+    msg += "-" * 50 + "\n"
+    
+    for ticker, price, delta, ratio, ema_signal, sma_signal in rows:
+        ema_icon = "🟢" if ema_signal else "🔴"
+        sma_icon = "🟢" if sma_signal else "🔴"
+        
+        msg += f"{ticker:<6} {price:>8.2f} {delta*100:>7.1f}% {ratio:>6.1f}x {ema_icon:>3} {sma_icon:>3}\n"
+    
+    msg += "</pre>\n\n"
+    msg += "<i>🟢 EMA20x50 (D) - лонг сигнал на дневном ТФ</i>\n"
+    msg += "<i>🟢 Цена x SMA30 (W) - цена выше SMA30 на недельном ТФ</i>"
+    
+    await update.message.reply_text(msg, parse_mode="HTML")
+
 async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 14 дней...")
     long_hits, short_hits = [], []
@@ -665,6 +762,7 @@ if Update and ContextTypes:
             "/stan_recent_short — акции с шорт пересечением SMA30 на 1D\n"
             "/stan_recent_week — акции с лонг пересечением SMA30 на 1W\n"
             "/moneyflow - Топ по росту и оттоку денежного потока (Money A/D)\n"
+            "/high_volume - Акции с повышенным объемом\n"
             "/delta — расчет дельты денежного потока для конкретной акции\n"
             "/rsi_top — Топ 10 перекупленных и перепроданных акций по RSI\n"
         )
@@ -1128,6 +1226,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
         app.add_handler(CommandHandler("stan_recent_week", stan_recent_week))
         app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
+        app.add_handler(CommandHandler("high_volume", high_volume))
         app.add_handler(CommandHandler("rsi_top", rsi_top))
         app.add_handler(CallbackQueryHandler(handle_callback))
         delta_conv_handler = ConversationHandler(
