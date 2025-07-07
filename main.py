@@ -85,7 +85,7 @@ async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 7 дней...")
+    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 14 дней...")
     long_hits, short_hits = [], []
     today = datetime.today().date()
     
@@ -99,14 +99,14 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
             
             # Получаем данные за последние 8 дней для анализа
-            recent = df.tail(8)  # 7 дней + текущий
+            recent = df.tail(15)  # 7 дней + текущий
             
             # Текущие значения
             current_close = df['close'].iloc[-1]
             current_ema20 = df['EMA20'].iloc[-1]
             current_ema50 = df['EMA50'].iloc[-1]
             
-            # Проверяем пересечения за последние 7 дней
+            # Проверяем пересечения за последние 14 дней
             for i in range(1, len(recent)):
                 prev_ema20 = recent['EMA20'].iloc[i-1]
                 prev_ema50 = recent['EMA50'].iloc[i-1]
@@ -149,16 +149,16 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Формируем сообщение
     msg = ""
     if long_hits:
-        msg += f"🟢 *Лонг пересечение EMA20×50 за последние 7 дней, всего: {len(long_hits)}:*\n"
+        msg += f"🟢 *Лонг пересечение EMA20×50 за последние 14 дней, всего: {len(long_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
     else:
-        msg += "🟢 *Лонг сигналов не найдено за последние 7 дней*\n\n"
+        msg += "🟢 *Лонг сигналов не найдено за последние 14 дней*\n\n"
         
     if short_hits:
-        msg += f"🔴 *Шорт пересечение EMA20×50 за последние 7 дней, всего: {len(short_hits)}:*\n"
+        msg += f"🔴 *Шорт пересечение EMA20×50 за последние 14 дней, всего: {len(short_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in short_hits)
     else:
-        msg += "🔴 *Шорт сигналов не найдено за последние 7 дней*"
+        msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
 
@@ -166,8 +166,8 @@ async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Получает количество дней и выполняет расчет дельты"""
     try:
         days = int(update.message.text)
-        if not (1 <= days <= 60):
-            await update.message.reply_text("⚠️ Введите число от 1 до 60.")
+        if not (1 <= days <= 100):
+            await update.message.reply_text("⚠️ Введите число от 1 до 100.")
             return ASK_DELTA_DAYS
 
         ticker = context.user_data['delta_ticker']
@@ -507,7 +507,7 @@ def plot_stan_chart(df, ticker):
         return None
 
 # Получение данных с MOEX
-def get_moex_data(ticker="SBER", days=100):
+def get_moex_data(ticker="SBER", days=120):
     try:
         till = datetime.today().strftime('%Y-%m-%d')
         from_date = (datetime.today() - pd.Timedelta(days=days * 1.5)).strftime('%Y-%m-%d')
