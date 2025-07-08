@@ -581,22 +581,22 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>17}  {'Δ / Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>17}  {'Δ / Оборот':>8} {'Δ Цены 1D':>7} {'Объём':>9} {'ema20х50':>6} {'sma30':>6}\n"
         # Убираем линию с дефисами, как просил
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_up[:10]:
             ema_icon = "🟢" if ema_signal else "🔴"
             sma_icon = "🟢" if sma_signal else "🔴"
-            msg += f"{ticker:<6}  {price_pct:+6.1f}%  {ad_delta/1_000_000:13,.0f} млн ₽  {delta_pct:11.1f}%  {price_change_day*100:>7.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
+            msg += f"{ticker:<6}  {price_pct:+6.1f}%  {ad_delta/1_000_000:9,.0f} млн ₽  {delta_pct:11.1f}%  {price_change_day*100:>7.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
     
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>17}  {'Δ / Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>17}  {'Δ / Оборот':>8} {'Δ Цены 1D':>7} {'Объём':>9} {'ema20х50':>6} {'sma30':>6}\n"
         # Линию тоже убираем
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_down[:10]:
-            msg += f"{ticker:<6}  {price_pct:+6.1f}%  {ad_delta/1_000_000:13,.0f} млн ₽  {delta_pct:11.1f}%  {price_change_day*100:>7.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
+            msg += f"{ticker:<6}  {price_pct:+6.1f}%  {ad_delta/1_000_000:9,.0f} млн ₽  {delta_pct:11.1f}%  {price_change_day*100:>7.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
         msg += "</pre>\n"
     
     await update.message.reply_text(msg, parse_mode="HTML")
