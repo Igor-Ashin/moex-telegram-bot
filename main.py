@@ -586,7 +586,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_up[:10]:
             ema_icon = "🟢" if ema_signal else "🔴"
             sma_icon = "🟢" if sma_signal else "🔴"
-            msg += f"{ticker:<6}  {price_pct:9.1f}%  {ad_delta/1_000_000:11,.0f} млн ₽  {delta_pct:10.1f}%  {price_change_day*100:>8.1f}%  {ratio:>8.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
+            msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:10.1f}%  {price_change_day*100:>8.1f}%  {ratio:>8.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
     
     # 📉 Падение
@@ -596,7 +596,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>6} {'sma30':>4}\n"
         # Линию тоже убираем
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_down[:10]:
-            msg += f"{ticker:<6}  {price_pct:9.1f}%  {ad_delta/1_000_000:11,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>8.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
+            msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>8.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
         msg += "</pre>\n"
     
     await update.message.reply_text(msg, parse_mode="HTML")
