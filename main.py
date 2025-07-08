@@ -382,6 +382,8 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         else:
             ema_icon = "⚫"
             ema_label = "Нет сигнала"
+
+        sma_icon = "🟢" if price_above_sma30 else "🔴"
         
         msg += "<pre>\n"
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ/Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
