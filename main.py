@@ -523,13 +523,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     days = context.user_data.get("days", 10)  # по умолчанию 10
     await update.message.reply_text(f"🔍 Ищу Топ по росту и оттоку денежного потока за {days} дней...")
     
-                if ema20x50_long:
-                ema_icon = "🟢"
-            elif ema20x50_short:
-                ema_icon = "🔴"
-            else:
-                ema_icon = "⚫"
-            sma_icon = "🟢" if sma_signal else "🔴" = []
+    result = []
     for ticker in sum(SECTORS.values(), []):
         try:
             df = get_moex_data(ticker, days=100)  # с запасом
