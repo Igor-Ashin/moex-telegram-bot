@@ -343,7 +343,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
 
         # Изменение цены за день
-        price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
+        price_change_day = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
 
         # SMA30 Weekly
         try:
@@ -360,9 +360,9 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         
         # 📊 Отношение дельты потока к обороту (%)
         if avg_turnover != 0:
-            delta_vs_turnover = 100 * ad_delta / avg_turnover
+            delta_pct = 100 * ad_delta / avg_turnover
         else:
-            delta_vs_turnover = 0
+            delta_pct = 0
 
         # Формируем сообщение
         msg = f"📊 Анализ дельты денежного потока для {ticker}\n"
