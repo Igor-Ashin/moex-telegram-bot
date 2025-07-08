@@ -386,7 +386,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         sma_icon = "🟢" if price_above_sma30 else "🔴"
         
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ/Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>10} {'sma30':>4}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ/Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_vs_turnover:8.1f}%  {price_change*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
         
@@ -521,7 +521,7 @@ def calculate_money_ad(df):
 
 async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     days = context.user_data.get("days", 10)  # по умолчанию 10
-    await update.message.reply_text(f"🔍 Ищу Топ по росту и оттоку денежного потока за {days} дней...")
+    await update.message.reply_text(f"🔍 Ищу Топ по притоку и оттоку денежного потока за {days} дней...")
     
     result = []
     for ticker in sum(SECTORS.values(), []):
@@ -575,7 +575,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Условие для лонг сигнала EMA20x50
             ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
-
+            # Условие для лонг сигнала EMA20x50
             ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
 
             # Изменение цены за день
@@ -639,11 +639,11 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 📈 Рост
     if result_up:
-        msg += "📈 Топ 10 по росту:\n"
+        msg += "📈 Топ 10 по притоку:\n"
         msg += "<pre>\n"
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Убираем линию с дефисами, как просил
-        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, ema_short_signal, sma_signal in result_up[:10]:
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema20x50_long, ema_short_signal, sma_signal in result_up[:10]:
             if ema20x50_long:
                 ema_icon = "🟢"
             elif ema20x50_short:
@@ -660,7 +660,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "<pre>\n"
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Линию тоже убираем
-        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, ema_short_signal, sma_signal in result_down[:10]:
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema20x50_long, ema_short_signal, sma_signal in result_down[:10]:
             if ema20x50_long:
                 ema_icon = "🟢"
             elif ema20x50_short:
