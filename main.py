@@ -643,7 +643,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "<pre>\n"
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Убираем линию с дефисами, как просил
-        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema20x50_long, ema_short_signal, sma_signal in result_up[:10]:
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema20x50_long, ema20x50_short, sma_signal in result_up[:10]:
             if ema20x50_long:
                 ema_icon = "🟢"
             elif ema20x50_short:
@@ -660,7 +660,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "<pre>\n"
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Линию тоже убираем
-        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema20x50_long, ema_short_signal, sma_signal in result_down[:10]:
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema20x50_long, ema20x50_short, sma_signal in result_down[:10]:
             if ema20x50_long:
                 ema_icon = "🟢"
             elif ema20x50_short:
@@ -754,15 +754,31 @@ def get_moex_data(ticker="SBER", days=120):
 
 # Вычисление RSI вручную
 def compute_rsi(series, window=14):
-    if len(series) < window:
+    """
+    Вычисляет RSI используя pandas ewm для сглаживания Wilder's
+    """
+    if len(series) < window + 1:
         return pd.Series([np.nan] * len(series), index=series.index)
+    
     delta = series.diff()
     gain = np.where(delta > 0, delta, 0)
     loss = np.where(delta < 0, -delta, 0)
-    avg_gain = pd.Series(gain, index=series.index).rolling(window=window).mean()
-    avg_loss = pd.Series(loss, index=series.index).rolling(window=window).mean()
+    
+    gain_series = pd.Series(gain, index=series.index)
+    loss_series = pd.Series(loss, index=series.index)
+    
+    # Используем ewm с alpha = 1/window для сглаживания Wilder's
+    alpha = 1.0 / window
+    avg_gain = gain_series.ewm(alpha=alpha, adjust=False).mean()
+    avg_loss = loss_series.ewm(alpha=alpha, adjust=False).mean()
+    
+    # Вычисляем RSI
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
+    
+    # Заменяем бесконечные значения на NaN
+    rsi = rsi.replace([np.inf, -np.inf], np.nan)
+    
     return rsi.round(0)
 
 # RSI и аномальные объемы
