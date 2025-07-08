@@ -386,15 +386,15 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         sma_icon = "🟢" if price_above_sma30 else "🔴"
         
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ/Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ/Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>10} {'sma30':>4}\n"
         msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_vs_turnover:8.1f}%  {price_change*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
         
         # Добавляем интерпретацию результатов
         if ad_delta > 0:
-            msg += "Положительная дельта потока - деньги притекают в акцию 🟢 \n"
+            msg += "Деньги приходят в акцию 🟢 \n"
         else:
-            msg += "Отрицательная дельта потока - деньги оттекают из акции 🔴\n"
+            msg += "Деньги уходят из акции 🔴\n"
         
         msg += f"💰 Среднедневной оборот: {avg_turnover/1_000_000:.1f} млн ₽\n"
 
@@ -622,9 +622,9 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print(f"Ошибка Money A/D для {ticker}: {e}")
             continue
 
-        if not result:
-            await update.message.reply_text("Не найдено активов с ростом или падением денежного потока (Money A/D)")
-            return
+    if not result:
+        await update.message.reply_text("Не найдено активов с ростом или падением денежного потока (Money A/D)")
+        return
 
     # Разделим на положительные и отрицательные дельты
     result_up = [r for r in result if r[2] > 0]
@@ -650,6 +650,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ema_icon = "🔴"
             else:
                 ema_icon = "⚫"
+            sma_icon = "🟢" if sma_signal else "🔴"
             msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
     
@@ -660,12 +661,17 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Линию тоже убираем
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, ema_short_signal, sma_signal in result_down[:10]:
+            if ema20x50_long:
+                ema_icon = "🟢"
+            elif ema20x50_short:
+                ema_icon = "🔴"
+            else:
+                ema_icon = "⚫"
+            sma_icon = "🟢" if sma_signal else "🔴"
             msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n"
     
     await update.message.reply_text(msg, parse_mode="HTML")
-
-
 
 
 # Получение данных для Штейн
