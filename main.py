@@ -295,6 +295,12 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
             await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте уменьшить количество дней.")
             return
 
+        dfall = get_moex_data(ticker, days=100)  # с запасом
+        if dfall.empty or len(df) < 50:
+            await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте уменьшить количество дней.")
+            return
+
+        
         df = df.rename(columns={'close': 'close', 'volume': 'volume'})
         df = calculate_money_ad(df)
 
@@ -311,12 +317,48 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         price_pct = 100 * price_delta / price_start
 
         # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
-        filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
+        filter_turnover_series = dfall['volume'].iloc[-10:] * dfall['close'].iloc[-10:]
         filter_avg_turnover = filter_turnover_series.mean()
         
         # 💰 Среднедневной денежный оборот за период
         turnover_series = df['volume'].iloc[-days:] * df['close'].iloc[-days:]
         avg_turnover = turnover_series.mean()
+
+
+        # Сегодняшний оборот
+        today_volume = df['volume'].iloc[-1]
+        today_close = df['close'].iloc[-1]
+        today_turnover = today_volume * today_close
+        
+        # Коэффициент превышения объёма
+        ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
+
+        # EMA20/EMA50 Daily
+        dfall['EMA20'] = dfall['close'].ewm(span=20, adjust=False).mean()
+        dfall['EMA50'] = dfall['close'].ewm(span=50, adjust=False).mean()
+        
+        current_ema20 = dfall['EMA20'].iloc[-1]
+        current_ema50 = dfall['EMA50'].iloc[-1]
+        current_price = dfall['close'].iloc[-1]
+        
+        # Условие для лонг сигнала EMA20x50
+        ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
+
+        # Изменение цены за день
+        price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
+
+        # SMA30 Weekly
+        try:
+            wdf = get_moex_weekly_data(ticker, weeks=80)  # Больше недель для SMA30
+            if len(wdf) >= 30:
+                wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
+                weekly_sma30 = wdf['SMA30'].iloc[-1]
+                weekly_price = wdf['close'].iloc[-1]
+                price_above_sma30 = weekly_price > weekly_sma30 if pd.notna(weekly_sma30) else False
+            else:
+                price_above_sma30 = False
+        except:
+            price_above_sma30 = False
         
         # 📊 Отношение дельты потока к обороту (%)
         if avg_turnover != 0:
@@ -331,10 +373,14 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         # Добавляем предупреждение о низком обороте
         if filter_avg_turnover < 50_000_000:
             msg += "⚠️ Внимание: низкий среднедневной оборот (< 50 млн ₽)\n\n"
+
+        # Иконки для сигналов
+        ema_icon = "🟢" if ema20x50_long else "🔴"
+        sma_icon = "🟢" if price_above_sma30 else "🔴"
         
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>19}  {'Δ/Оборот':>12}\n"
-        msg += f"{ticker:<6}  {price_pct:+8.1f}%  {ad_delta/1_000_000:13,.0f} млн ₽  {delta_vs_turnover:9.1f}%\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>19}  {'Δ/Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
+        msg += f"{ticker:<6}  {price_pct:+8.1f}%  {ad_delta/1_000_000:13,.0f} млн ₽  {delta_vs_turnover:9.1f}%  {price_change*100:>7.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
         
         # Добавляем интерпретацию результатов
@@ -344,6 +390,10 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
             msg += "📉 Отрицательная дельта потока - деньги оттекают из акции\n"
         
         msg += f"💰 Среднедневной оборот: {avg_turnover/1_000_000:.1f} млн ₽"
+
+        # Добавляем расшифровку сигналов
+        msg += f"📊 EMA20x50: {ema_icon} ({'Лонг' if ema20x50_long else 'Нет сигнала'})\n"
+        msg += f"📊 SMA30 Weekly: {sma_icon} ({'Выше' if price_above_sma30 else 'Ниже'})"
         
         await update.message.reply_text(msg, parse_mode="HTML")
         
@@ -581,22 +631,22 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if result_up:
         msg += "📈 Топ 10 по росту:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>10} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>6} {'sma30':>4}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Убираем линию с дефисами, как просил
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_up[:10]:
             ema_icon = "🟢" if ema_signal else "🔴"
             sma_icon = "🟢" if sma_signal else "🔴"
-            msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:10.1f}%  {price_change_day*100:>8.1f}%  {ratio:>8.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
+            msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
     
     # 📉 Падение
     if result_down:
         msg += "📉 Топ 10 по оттоку:\n"
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>6} {'sma30':>4}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Линию тоже убираем
         for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_down[:10]:
-            msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>8.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
+            msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n"
     
     await update.message.reply_text(msg, parse_mode="HTML")
