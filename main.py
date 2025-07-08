@@ -290,14 +290,9 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(f"🔍 Рассчитываю дельту денежного потока для {ticker} за {days} дней...")
     
     try:
-        df = get_moex_data(ticker, days=days + 5)  # с запасом
+        df = get_moex_data(ticker, days=100)  # с запасом
         if df.empty or len(df) < days + 1:
-            await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте уменьшить количество дней.")
-            return
-
-        dfall = get_moex_data(ticker, days=100)  # с запасом
-        if dfall.empty or len(df) < 50:
-            await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте уменьшить количество дней.")
+            await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте увеличить количество дней.")
             return
 
         
@@ -317,7 +312,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         price_pct = 100 * price_delta / price_start
 
         # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
-        filter_turnover_series = dfall['volume'].iloc[-10:] * dfall['close'].iloc[-10:]
+        filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
         filter_avg_turnover = filter_turnover_series.mean()
         
         # 💰 Среднедневной денежный оборот за период
@@ -334,12 +329,12 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
 
         # EMA20/EMA50 Daily
-        dfall['EMA20'] = dfall['close'].ewm(span=20, adjust=False).mean()
-        dfall['EMA50'] = dfall['close'].ewm(span=50, adjust=False).mean()
+        df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+        df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
         
-        current_ema20 = dfall['EMA20'].iloc[-1]
-        current_ema50 = dfall['EMA50'].iloc[-1]
-        current_price = dfall['close'].iloc[-1]
+        current_ema20 = df['EMA20'].iloc[-1]
+        current_ema50 = df['EMA50'].iloc[-1]
+        current_price = df['close'].iloc[-1]
         
         # Условие для лонг сигнала EMA20x50
         ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
