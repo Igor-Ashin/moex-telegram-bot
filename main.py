@@ -339,6 +339,9 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         # Условие для лонг сигнала EMA20x50
         ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
 
+        # Условие для шорт сигнала EMA20x50
+        ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
+
         # Изменение цены за день
         price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
 
@@ -370,25 +373,32 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
             msg += "⚠️ Внимание: низкий среднедневной оборот (< 50 млн ₽)\n\n"
 
         # Иконки для сигналов
-        ema_icon = "🟢" if ema20x50_long else "🔴"
-        sma_icon = "🟢" if price_above_sma30 else "🔴"
+        if ema20x50_long:
+            ema_icon = "🟢"
+            ema_label = "Лонг"
+        elif ema20x50_short:
+            ema_icon = "🔴"
+            ema_label = "Шорт"
+        else:
+            ema_icon = "⚫"
+            ema_label = "Нет сигнала"
         
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>19}  {'Δ/Оборот':>12} {'Δ Цены 1D':>7} {'Объём':>6} {'ema20х50':>6} {'sma30':>6}\n"
-        msg += f"{ticker:<6}  {price_pct:+8.1f}%  {ad_delta/1_000_000:13,.0f} млн ₽  {delta_vs_turnover:9.1f}%  {price_change*100:>7.1f}%  {ratio:>6.1f}x  {ema_icon:>6} {sma_icon:>4}\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ/Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
+        msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_vs_turnover:8.1f}%  {price_change*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
         
         # Добавляем интерпретацию результатов
         if ad_delta > 0:
-            msg += "📈 Положительная дельта потока - деньги притекают в акцию\n"
+            msg += "Положительная дельта потока - деньги притекают в акцию 🟢 \n"
         else:
-            msg += "📉 Отрицательная дельта потока - деньги оттекают из акции\n"
+            msg += "Отрицательная дельта потока - деньги оттекают из акции 🔴\n"
         
-        msg += f"💰 Среднедневной оборот: {avg_turnover/1_000_000:.1f} млн ₽"
+        msg += f"💰 Среднедневной оборот: {avg_turnover/1_000_000:.1f} млн ₽\n"
 
         # Добавляем расшифровку сигналов
-        msg += f"📊 EMA20x50: {ema_icon} ({'Лонг' if ema20x50_long else 'Нет сигнала'})\n"
-        msg += f"📊 SMA30 Weekly: {sma_icon} ({'Выше' if price_above_sma30 else 'Ниже'})"
+        msg += f"EMA20x50: {ema_icon} ({ema_label})\n"
+        msg += f"SMA30 Weekly: {sma_icon} ({'Цена выше SMA30 1W' if price_above_sma30 else 'Цена ниже SMA30 1W'})"
         
         await update.message.reply_text(msg, parse_mode="HTML")
         
@@ -564,6 +574,8 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Условие для лонг сигнала EMA20x50
             ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
 
+            ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
+
             # Изменение цены за день
             price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
 
@@ -601,6 +613,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     price_change, 
                     ratio, 
                     ema20x50_long, 
+                    ema20x50_short,
                     price_above_sma30,
     ))
         except Exception as e:
@@ -628,9 +641,13 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "<pre>\n"
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Убираем линию с дефисами, как просил
-        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_up[:10]:
-            ema_icon = "🟢" if ema_signal else "🔴"
-            sma_icon = "🟢" if sma_signal else "🔴"
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, ema_short_signal, sma_signal in result_up[:10]:
+            if ema20x50_long:
+                ema_icon = "🟢"
+            elif ema20x50_short:
+                ema_icon = "🔴"
+            else:
+                ema_icon = "⚫"
             msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n\n"
     
@@ -640,7 +657,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "<pre>\n"
         msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         # Линию тоже убираем
-        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, sma_signal in result_down[:10]:
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema_signal, ema_short_signal, sma_signal in result_down[:10]:
             msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
         msg += "</pre>\n"
     
