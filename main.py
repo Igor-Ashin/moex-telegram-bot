@@ -269,7 +269,88 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 14 свечей...")
+    long_hits, short_hits = [], []
+    today = datetime.today().date()
     
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            df = get_moex_data_4h(ticker, days=200)  # достаточно для расчета EMA
+            if df.empty or len(df) < 150:
+                continue
+                
+            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+            
+            # Получаем данные за последние 15 дней для анализа
+            recent = df.tail(15)  # 14 дней + текущий
+            
+            # Текущие значения
+            current_close = df['close'].iloc[-1]
+            current_ema20 = df['EMA20'].iloc[-1]
+            current_ema50 = df['EMA50'].iloc[-1]
+            
+            # Проверяем пересечения за последние 14 дней
+            for i in range(1, len(recent)):
+                prev_ema20 = recent['EMA20'].iloc[i-1]
+                prev_ema50 = recent['EMA50'].iloc[i-1]
+                curr_ema20 = recent['EMA20'].iloc[i]
+                curr_ema50 = recent['EMA50'].iloc[i]
+                curr_close = recent['close'].iloc[i]  # Цена в день пересечения
+                
+                # Получаем дату для текущего дня
+                date = recent.index[i].strftime('%d.%m.%Y %H:%M')
+                
+                # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
+                if (
+                    prev_ema20 <= prev_ema50
+                    and curr_ema20 > curr_ema50
+                    and curr_close > curr_ema20
+                    and current_close > current_ema20
+                    and current_ema20 > current_ema50
+                ):
+                    long_hits.append((ticker, date))
+                    break  # Только одно пересечение за период
+        
+                # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
+                elif (
+                    prev_ema20 >= prev_ema50
+                    and curr_ema20 < curr_ema50
+                    and curr_close < curr_ema20
+                    and current_close < current_ema20
+                    and current_ema20 < current_ema50
+                ):
+                    short_hits.append((ticker, date))
+                    break  # Только одно пересечение за период
+                    
+        except Exception as e:
+            print(f"Ошибка EMA для {ticker}: {e}")
+            continue
+    
+    # Сортировка по дате (новые вверх)
+    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
+    short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
+    
+    # Формируем сообщение
+    msg = ""
+    if long_hits:
+        msg += f"🟢 *Лонг пересечение EMA20×50 за последние 14 4Ч свечей, всего: {len(long_hits)}:*\n"
+        msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
+    else:
+        msg += "🟢 *Лонг сигналов не найдено за последние 14 4Ч свечей*\n\n"
+        
+    if short_hits:
+        msg += f"🔴 *Шорт пересечение EMA20×50 за последние 14 4Ч свечей, всего: {len(short_hits)}:*\n"
+        msg += "\n".join(f"{t} {d}" for t, d in short_hits)
+    else:
+        msg += "🔴 *Шорт сигналов не найдено за последние 14 4Ч свечей*"
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
 async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получает количество дней и выполняет расчет дельты"""
     try:
@@ -754,6 +835,34 @@ def get_moex_data(ticker="SBER", days=120):
         print(f"Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
 
+# Получение данных с MOEX
+def get_moex_data_4h(ticker="SBER", days=200):
+    try:
+        till = datetime.today().strftime('%Y-%m-%d')
+        from_date = (datetime.today() - pd.Timedelta(days=days * 1.5)).strftime('%Y-%m-%dT%H:%M:%S')
+        url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=4&from={from_date}&till={till}"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        candles = data['candles']['data']
+        columns = data['candles']['columns']
+        df = pd.DataFrame(candles, columns=columns)
+        df['begin'] = pd.to_datetime(df['begin'])
+        df = df.sort_values('begin')  # сортировка по дате
+        df.set_index('begin', inplace=True)
+        df = df.rename(columns={
+            'close': 'close',
+            'volume': 'volume',
+            'high': 'high',
+            'low': 'low'
+        })
+        df = df[['close', 'volume', 'high', 'low']].dropna()
+        return df.tail(days)
+    except Exception as e:
+        print(f"Ошибка получения данных для {ticker}: {e}")
+        return pd.DataFrame()
+
+
 # Вычисление RSI вручную
 def compute_rsi(series, window=14):
     """
@@ -897,6 +1006,7 @@ if Update and ContextTypes:
             "/chart_hv — выбрать акцию через кнопки\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
+            "/cross_ema20x50_4h — акции с пересечением EMA 20x50 на 4H\n"
             "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
             "/stan_recent_short — акции с шорт пересечением SMA30 на 1D\n"
             "/stan_recent_week — акции с лонг пересечением SMA30 на 1W\n"
@@ -1360,6 +1470,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("chart_hv", chart_hv))
         app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
+        application.add_handler(CommandHandler("cross4h", cross_ema20x50_4h))
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
