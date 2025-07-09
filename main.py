@@ -299,7 +299,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
             
             # Получаем данные за последние 15 дней для анализа
-            recent = df.tail(50)  # 50 свечей + текущий
+            recent = df.tail(51)  # 50 свечей + текущий
             
             # Текущие значения
             current_close = df['close'].iloc[-1]
@@ -861,8 +861,11 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFr
 
         df = pd.DataFrame(data).set_index("time").sort_index()
         #df.index = df.index.dt.tz_localize('UTC').dt.tz_convert('Europe/Moscow')
+        if df.index.tz is None:
+            df.index = df.index.tz_localize('UTC')
+        df.index = df.index.tz_convert('Europe/Moscow')
         # Переводим в московское время
-        df.index = df.index.dt.tz_convert("Europe/Moscow")
+        #df.index = df.index.dt.tz_convert("Europe/Moscow")
         return df
 
     except Exception as e:
