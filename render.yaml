@@ -8,4 +8,5 @@ services:
     envVars:
       - key: TELEGRAM_TOKEN
         sync: false
-
+      - key: TINKOFF_API_TOKEN   # <-- добавляешь это
+        sync: false
