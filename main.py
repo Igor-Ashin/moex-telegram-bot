@@ -10,8 +10,6 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from scipy.signal import argrelextrema
 import asyncio
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 # Заменяем telegram на условный заглушку или комментарий, чтобы избежать ошибки в окружении
 try:
@@ -728,115 +726,6 @@ def plot_stan_chart(df, ticker):
         return None
 
 
-#Открытый интерес
-async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⏳ Выполняется анализ открытого интереса...")
-    
-    date_till_dt = datetime.today() - timedelta(days=14)
-    date_till = date_till_dt.strftime('%Y-%m-%d')
-    
-    date_from_dt = date_till_dt - timedelta(days=30)  # берем последние 30 дней, с отсечкой 14 дней назад
-    date_from = date_from_dt.strftime('%Y-%m-%d')    
-    
-    def fetch(symbol, date_from, date_till):
-        url = f"https://iss.moex.com/iss/analyticalproducts/futoi/securities/{symbol}.json"
-        params = {'from': date_from, 'till': date_till}
-        if date_from:
-            params['from'] = date_from
-        if date_till:
-            params['till'] = date_till        
-        # Настройка retry стратегии
-        session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504]
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        
-        try:
-            response = session.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            # Проверка структуры данных
-            if 'futoi' not in data or 'data' not in data['futoi']:
-                raise ValueError(f"Неожиданная структура данных для {symbol}")
-    
-            cols = data['futoi']['columns']
-            rows = data['futoi']['data']
-            
-            if not rows:
-                raise ValueError(f"Нет данных для {symbol}")
-                
-            df = pd.DataFrame(rows, columns=cols)
-            return df
-            
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"Ошибка при получении данных для {symbol}: {e}")
-        except (KeyError, ValueError) as e:
-            raise Exception(f"Ошибка обработки данных для {symbol}: {e}")
-    
-    try:
-        msg = ""
-        symbols = [('MX', 'MX'), ('MM', 'MM')]
-        periods = [('DAY', 'day'), ('WEEK', 'week'), ('MONTH', 'month'), ('THREE_MONTH', '3 месяца')]
-
-        
-        for symbol, name in symbols:
-            try:
-                df = fetch(symbol, date_from, date_till)
-                msg += f"📈 Открытый интерес {name}\n\n"
-
-                parts = {'FIZ': 'Физ. лица', 'YUR': 'Юр. лица'}
-
-                for cl in ['FIZ', 'YUR']:
-                    dfc = df[df['clgroup'] == cl]
-                    if dfc.empty:
-                        msg += f"{parts[cl]}: Нет данных\n\n"
-                        continue
-
-                    pos_long = dfc['pos_long'].fillna(0).sum()
-                    pos_short = dfc['pos_short'].fillna(0).sum()
-                    msg += f"{parts[cl]}  \nLong {pos_long:,.0f}  Short {pos_short:,.0f}\n\n"
-
-                    msg += f"{'':20} {'день':>7} {'неделя':>9} {'месяц':>9} {'3 мес':>9}\n"
-                    for kind, label in [('LONG', 'Δ long'), ('SHORT', 'Δ short')]:
-                        row = f"{label:<16}"
-                        for p_col, _ in periods:
-                            col = f"{p_col}_CHANGE_{kind}"
-                            delta = dfc[col].fillna(0).sum()
-                            row += f" {delta:+9,.0f}"
-                        msg += row + "\n"
-                    msg += "\n"
-
-                total_long = df['pos_long'].fillna(0).sum()
-                total_short = df['pos_short'].fillna(0).sum()
-                total_oi = total_long + total_short
-                msg += f"Σ Open Interest: {total_oi:,.0f}  Long {total_long:,.0f}  Short {total_short:,.0f}\n\n"
-
-                msg += f"{'':20} {'день':>7} {'неделя':>9} {'месяц':>9} {'3 мес':>9}\n"
-                for kind, label in [('LONG', 'Δ Total')]:
-                    row = f"{label:<16}"
-                    for p_col, _ in periods:
-                        col = f"{p_col}_CHANGE_{kind}"
-                        delta = df[col].fillna(0).sum()
-                        row += f" {delta:+9,.0f}"
-                    msg += row + "\n\n"
-
-            except Exception as e:
-                msg += f"❌ Ошибка для {name}: {str(e)}\n\n"
-                msg += f"Колонки в данных: {', '.join(df.columns)}\n\n"
-
-        await update.message.reply_text(msg)
-
-    except Exception as e:
-        await update.message.reply_text(f"❌ Критическая ошибка: {str(e)}")
-
-
-
 
 # Получение данных с MOEX
 def get_moex_data(ticker="SBER", days=120):
@@ -1006,7 +895,6 @@ if Update and ContextTypes:
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
             "Команды:\n"
             "/chart_hv — выбрать акцию через кнопки\n"
-            "/open_interest - открытый интерес на фьючерсы"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
             "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
@@ -1470,7 +1358,6 @@ if ApplicationBuilder:
         keep_alive()  # ← запуск Flask
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("open_interest", open_interest))
         app.add_handler(CommandHandler("chart_hv", chart_hv))
         app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
         app.add_handler(CommandHandler("stan", stan))
