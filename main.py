@@ -729,7 +729,7 @@ def plot_stan_chart(df, ticker):
 
 
 #Открытый интерес
-async def open_interest(ctx):
+async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Выполняется анализ открытого интереса...")
     def fetch(symbol):
         url = f"https://iss.moex.com/iss/analyticalproducts/futoi/securities/{symbol}.json"
@@ -810,12 +810,12 @@ async def open_interest(ctx):
                 msg += f"❌ Ошибка для {symbol}: {str(e)}\n\n"
         
         if msg:
-            await ctx.send(msg)
+            await update.message.reply_text(msg)
         else:
-            await ctx.send("❌ Не удалось получить данные об открытом интересе")
+            await update.message.reply_text("❌ Не удалось получить данные об открытом интересе")
             
     except Exception as e:
-        await ctx.send(f"❌ Критическая ошибка: {str(e)}")
+        await update.message.reply_text(f"❌ Критическая ошибка: {str(e)}")
 
 
 
