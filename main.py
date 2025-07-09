@@ -10,6 +10,15 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from scipy.signal import argrelextrema
 import asyncio
+#Активация Токена Tinkoff
+import os
+from tinkoff.invest import Client
+
+TINKOFF_API_TOKEN = os.getenv("TINKOFF_API_TOKEN")
+
+client = Client(TINKOFF_API_TOKEN)
+
+
 
 # Заменяем telegram на условный заглушку или комментарий, чтобы избежать ошибки в окружении
 try:
@@ -838,7 +847,7 @@ def get_moex_data(ticker="SBER", days=120):
 # Получение данных с MOEX
 def get_moex_data_4h(ticker="SBER", days=200):
     try:
-        till = datetime.today().strftime('%Y-%m-%d')
+        till = datetime.today().strftime('%Y-%m-%dT%H:%M:%S')
         from_date = (datetime.today() - pd.Timedelta(days=days * 1.5)).strftime('%Y-%m-%dT%H:%M:%S')
         url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=4&from={from_date}&till={till}"
         r = requests.get(url, timeout=10)
