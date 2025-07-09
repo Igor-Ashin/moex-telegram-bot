@@ -770,52 +770,59 @@ async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         msg = ""
-        symbols = [('MIX', 'MIX'), ('MXI', 'MXI')]
+        symbols = [('MX', 'MIX'), ('MM', 'MXI')]
+        periods = [('DAY', 'day'), ('WEEK', 'week'), ('MONTH', 'month'), ('THREE_MONTH', '3 месяца')]
+
         
         for symbol, name in symbols:
             try:
                 df = fetch(symbol)
-                msg += f"📈 Открытый интерес {symbol}\n\n"
-                
+                msg += f"📈 Открытый интерес {name}\n\n"
+
                 parts = {'FIZ': 'Физ. лица', 'YUR': 'Юр. лица'}
-                
+
                 for cl in ['FIZ', 'YUR']:
                     dfc = df[df['CLGROUP'] == cl]
-                    
                     if dfc.empty:
                         msg += f"{parts[cl]}: Нет данных\n\n"
                         continue
-                    
-                    # Безопасное получение значений с проверкой на NaN
+
                     pos_long = dfc['POS_LONG'].fillna(0).sum()
                     pos_short = dfc['POS_SHORT'].fillna(0).sum()
-                    
-                    msg += f"{parts[cl]}\nLong {pos_long:,.0f} Short {pos_short:,.0f}\n"
-                    
-                    for period, col in [('день', 'DAY_CHANGE_LONG'), 
-                                      ('неделя', 'WEEK_CHANGE_LONG'), 
-                                      ('месяц', 'MONTH_CHANGE_LONG')]:
-                        delta = dfc[col].fillna(0).sum()
-                        msg += f"Δ long за {period} {delta:+,.0f}\n"
+                    msg += f"{parts[cl]}  \nLong {pos_long:,.0f}  Short {pos_short:,.0f}\n\n"
+
+                    msg += f"{'':20} {'день':>7} {'неделя':>9} {'месяц':>9} {'3 мес':>9}\n"
+                    for kind, label in [('LONG', 'Δ long'), ('SHORT', 'Δ short')]:
+                        row = f"{label:<16}"
+                        for p_col, _ in periods:
+                            col = f"{p_col}_CHANGE_{kind}"
+                            delta = dfc[col].fillna(0).sum()
+                            row += f" {delta:+9,.0f}"
+                        msg += row + "\n"
                     msg += "\n"
-                
-                # Общая статистика
+
                 total_long = df['POS_LONG'].fillna(0).sum()
                 total_short = df['POS_SHORT'].fillna(0).sum()
                 total_oi = total_long + total_short
-                
-                msg += f"Σ Open Interest: {total_oi:,.0f}  Long {total_long:,.0f} Short {total_short:,.0f}\n\n"
-                
+                msg += f"Σ Open Interest: {total_oi:,.0f}  Long {total_long:,.0f}  Short {total_short:,.0f}\n\n"
+
+                msg += f"{'':20} {'день':>7} {'неделя':>9} {'месяц':>9} {'3 мес':>9}\n"
+                for kind, label in [('LONG', 'Δ Total')]:
+                    row = f"{label:<16}"
+                    for p_col, _ in periods:
+                        col = f"{p_col}_CHANGE_{kind}"
+                        delta = df[col].fillna(0)[col].sum()
+                        row += f" {delta:+9,.0f}"
+                    msg += row + "\n\n"
+
             except Exception as e:
-                msg += f"❌ Ошибка для {symbol}: {str(e)}\n\n"
-        
-        if msg:
-            await update.message.reply_text(msg)
-        else:
-            await update.message.reply_text("❌ Не удалось получить данные об открытом интересе")
-            
+                msg += f"❌ Ошибка для {name}: {str(e)}\n\n"
+
+        await update.message.reply_text(msg)
+
     except Exception as e:
         await update.message.reply_text(f"❌ Критическая ошибка: {str(e)}")
+
 
 
 
