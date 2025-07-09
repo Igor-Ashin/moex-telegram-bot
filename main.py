@@ -731,9 +731,20 @@ def plot_stan_chart(df, ticker):
 #Открытый интерес
 async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Выполняется анализ открытого интереса...")
+    
+    date_till_dt = datetime.today() - timedelta(days=14)
+    date_till = date_till_dt.strftime('%Y-%m-%d')
+    
+    date_from_dt = date_till_dt - timedelta(days=30)  # берем последние 30 дней, с отсечкой 14 дней назад
+    date_from = date_from_dt.strftime('%Y-%m-%d')    
+    
     def fetch(symbol):
         url = f"https://iss.moex.com/iss/analyticalproducts/futoi/securities/{symbol}.json"
-        
+        params = {}
+        if date_from:
+            params['from'] = date_from
+        if date_till:
+            params['till'] = date_till        
         # Настройка retry стратегии
         session = requests.Session()
         retry_strategy = Retry(
@@ -746,7 +757,7 @@ async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session.mount("https://", adapter)
         
         try:
-            response = session.get(url, timeout=10)
+            response = session.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
             
@@ -770,25 +781,25 @@ async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         msg = ""
-        symbols = [('MX', 'MIX'), ('MM', 'MXI')]
+        symbols = [('MX', 'MX'), ('MM', 'MM')]
         periods = [('DAY', 'day'), ('WEEK', 'week'), ('MONTH', 'month'), ('THREE_MONTH', '3 месяца')]
 
         
         for symbol, name in symbols:
             try:
-                df = fetch(symbol)
+                df = fetch(symbol, date_from, date_till)
                 msg += f"📈 Открытый интерес {name}\n\n"
 
                 parts = {'FIZ': 'Физ. лица', 'YUR': 'Юр. лица'}
 
                 for cl in ['FIZ', 'YUR']:
-                    dfc = df[df['CLGROUP'] == cl]
+                    dfc = df[df['clgroup'] == cl]
                     if dfc.empty:
                         msg += f"{parts[cl]}: Нет данных\n\n"
                         continue
 
-                    pos_long = dfc['POS_LONG'].fillna(0).sum()
-                    pos_short = dfc['POS_SHORT'].fillna(0).sum()
+                    pos_long = dfc['pos_long'].fillna(0).sum()
+                    pos_short = dfc['pos_short'].fillna(0).sum()
                     msg += f"{parts[cl]}  \nLong {pos_long:,.0f}  Short {pos_short:,.0f}\n\n"
 
                     msg += f"{'':20} {'день':>7} {'неделя':>9} {'месяц':>9} {'3 мес':>9}\n"
@@ -801,8 +812,8 @@ async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         msg += row + "\n"
                     msg += "\n"
 
-                total_long = df['POS_LONG'].fillna(0).sum()
-                total_short = df['POS_SHORT'].fillna(0).sum()
+                total_long = df['pos_long'].fillna(0).sum()
+                total_short = df['pos_short'].fillna(0).sum()
                 total_oi = total_long + total_short
                 msg += f"Σ Open Interest: {total_oi:,.0f}  Long {total_long:,.0f}  Short {total_short:,.0f}\n\n"
 
@@ -811,7 +822,7 @@ async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     row = f"{label:<16}"
                     for p_col, _ in periods:
                         col = f"{p_col}_CHANGE_{kind}"
-                        delta = df[col].fillna(0)[col].sum()
+                        delta = df[col].fillna(0).sum()
                         row += f" {delta:+9,.0f}"
                     msg += row + "\n\n"
 
