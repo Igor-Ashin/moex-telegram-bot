@@ -738,9 +738,9 @@ async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     date_from_dt = date_till_dt - timedelta(days=30)  # берем последние 30 дней, с отсечкой 14 дней назад
     date_from = date_from_dt.strftime('%Y-%m-%d')    
     
-    def fetch(symbol):
+    def fetch(symbol, date_from, date_till):
         url = f"https://iss.moex.com/iss/analyticalproducts/futoi/securities/{symbol}.json"
-        params = {}
+        params = {'from': date_from, 'till': date_till}
         if date_from:
             params['from'] = date_from
         if date_till:
