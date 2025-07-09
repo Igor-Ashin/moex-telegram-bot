@@ -1470,7 +1470,7 @@ if ApplicationBuilder:
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("chart_hv", chart_hv))
         app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
-        app.add_handler(CommandHandler("cross4h", cross_ema20x50_4h))
+        app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
         app.add_handler(CommandHandler("stan", stan))
         app.add_handler(CommandHandler("stan_recent", stan_recent))
         app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
