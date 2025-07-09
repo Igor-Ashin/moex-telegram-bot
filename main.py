@@ -730,6 +730,7 @@ def plot_stan_chart(df, ticker):
 
 #Открытый интерес
 async def open_interest(ctx):
+    await update.message.reply_text("⏳ Выполняется анализ открытого интереса...")
     def fetch(symbol):
         url = f"https://iss.moex.com/iss/analyticalproducts/futoi/securities/{symbol}.json"
         
