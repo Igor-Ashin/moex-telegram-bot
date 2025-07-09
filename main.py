@@ -817,6 +817,7 @@ async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             except Exception as e:
                 msg += f"❌ Ошибка для {name}: {str(e)}\n\n"
+                msg += f"Колонки в данных: {', '.join(df.columns)}\n\n"
 
         await update.message.reply_text(msg)
 
