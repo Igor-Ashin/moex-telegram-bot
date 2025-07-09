@@ -751,11 +751,11 @@ async def open_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data = response.json()
             
             # Проверка структуры данных
-            if 'securities' not in data:
+            if 'futoi' not in data or 'data' not in data['futoi']:
                 raise ValueError(f"Неожиданная структура данных для {symbol}")
-                
-            cols = data['securities']['columns']
-            rows = data['securities']['data']
+    
+            cols = data['futoi']['columns']
+            rows = data['futoi']['data']
             
             if not rows:
                 raise ValueError(f"Нет данных для {symbol}")
