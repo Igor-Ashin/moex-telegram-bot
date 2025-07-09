@@ -7,12 +7,12 @@ import pandas as pd
 import numpy as np
 import os  # ← должен быть на самом верху, на уровне других импортов
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
 import asyncio
 #Активация Токена Tinkoff
 import os
-from tinkoff.invest import Client
+from tinkoff.invest import Client, CandleInterval
 
 TINKOFF_API_TOKEN = os.getenv("TINKOFF_API_TOKEN")
 
@@ -92,6 +92,10 @@ async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Вы ввели тикер: {ticker}\n\n📅 Введите количество дней для расчета дельты денежного потока (например, 10):")
     return ASK_DELTA_DAYS
 
+
+def get_figi_by_ticker(ticker):
+    search = client.instruments.find_instrument(query=ticker)
+    return search.instruments[0].figi if search.instruments else None
 
 async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу акции с повышенным объёмом…")
@@ -287,7 +291,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data_4h(ticker, days=200)  # достаточно для расчета EMA
+            df = get_moex_data_4h_tinkoff(ticker, days=200)  # достаточно для расчета EMA
             if df.empty or len(df) < 150:
                 continue
                 
@@ -815,7 +819,55 @@ def plot_stan_chart(df, ticker):
         plt.close()
         return None
 
+def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFrame:
+    """
+    Загружает 4H свечи по тикеру из Tinkoff Invest API за последние 'days' дней.
+    Возвращает DataFrame с индексом по московскому времени и колонками open, high, low, close, volume.
+    """
+    try:
+        # Получаем FIGI по тикеру
+        search = client.instruments.find_instrument(query=ticker)
+        if not search.instruments:
+            print(f"FIGI для тикера {ticker} не найдено")
+            return pd.DataFrame()
+        figi = search.instruments[0].figi
 
+        to_dt = datetime.utcnow()
+        from_dt = to_dt - timedelta(days=days)
+
+        candles_response = client.market_data.get_candles(
+            figi=figi,
+            from_=from_dt,
+            to=to_dt,
+            interval=CandleInterval.CANDLE_INTERVAL_4H,
+        )
+
+        data = []
+        for c in candles_response.candles:
+            open_p = c.open.units + c.open.nano / 1e9
+            high_p = c.high.units + c.high.nano / 1e9
+            low_p = c.low.units + c.low.nano / 1e9
+            close_p = c.close.units + c.close.nano / 1e9
+            volume = c.volume
+            timestamp = pd.to_datetime(c.time)
+            data.append({
+                "time": timestamp,
+                "open": open_p,
+                "high": high_p,
+                "low": low_p,
+                "close": close_p,
+                "volume": volume
+            })
+
+        df = pd.DataFrame(data).set_index("time").sort_index()
+        #df.index = df.index.dt.tz_localize('UTC').dt.tz_convert('Europe/Moscow')
+        # Переводим в московское время
+        df.index = df.index.dt.tz_convert("Europe/Moscow")
+        return df
+
+    except Exception as e:
+        print(f"Ошибка получения данных для {ticker}: {e}")
+        return pd.DataFrame()
 
 # Получение данных с MOEX
 def get_moex_data(ticker="SBER", days=120):
