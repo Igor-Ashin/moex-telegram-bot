@@ -40,11 +40,11 @@ SECTORS = {
     "Телеком": ["MTSS", "RTKMP", "RTKM", "MGTSP"],
     "Строители": [ "SMLT", "PIKK", "ETLN", "LSRG"],
     "Ритейл": ["X5", "MGNT", "LENT", "BELU",  "OZON", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID", "VSEH", "FIXP"],
-    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "MSNG", "ELFV"],
+    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "ELFV"],
     "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
     "Агро": ["PHOR", "RAGR", "KZOS", "NKNC", "UFOSP", "KAZT", "AKRN", "NKHP"],
-    "Медицина": ["MDMG", "OZPH", "PRMD", "GECO", "APTK", "LIFE", "ABIO", "GEMC"],
-    "Машиностроение": ["UWGN", "SVAV", "KMAZ", "UNAC", "IRKT", "ZILLP"]
+    "Медицина": ["MDMG", "OZPH", "PRMD", "GECO", "APTK", "ABIO", "GEMC"],
+    "Машиностроение": ["UWGN", "SVAV", "KMAZ", "UNAC", "IRKT"]
 }
 
 TICKERS_PER_PAGE = 10
@@ -287,7 +287,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = datetime.today().date()
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data_4h_tinkoff(ticker, days=25)  # достаточно для расчета EMA
+            df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25)  # достаточно для расчета EMA
                 
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
