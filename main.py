@@ -1555,20 +1555,18 @@ from telegram.ext import (
     ConversationHandler, MessageHandler, filters
 )
 
-app_web = Flask('')
+# ==== Запуск Telegram-бота через webhook (без Flask) ====
 
-@app_web.route('/')
-def home():
-    return "Бот работает!"
+if __name__ == '__main__':
+    TOKEN = os.getenv("TELEGRAM_TOKEN")
+    if not TOKEN:
+        print("❌ Переменная окружения TELEGRAM_TOKEN не установлена.")
+        exit()
 
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-if TOKEN is None:
-    print("Ошибка: переменная окружения TELEGRAM_TOKEN не установлена.")
-else:
-    # Создаем экземпляр бота
+    # Создаём приложение
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Регистрируем хендлеры
+    # === Добавляем хендлеры ===
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("chart_hv", chart_hv))
     app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
@@ -1582,6 +1580,7 @@ else:
     app.add_handler(CommandHandler("rsi_top", rsi_top))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
+    # Хендлеры с диалогами
     delta_conv_handler = ConversationHandler(
         entry_points=[CommandHandler("delta", ask_ticker)],
         states={
@@ -1601,35 +1600,11 @@ else:
     )
     app.add_handler(conv_handler)
 
-    print("✅ Бот запущен и поддерживается Flask-сервером.")
+    # === Запуск с Webhook ===
+    print("🚀 Запускаем бота через webhook...")
 
-    # --- Flask route для Telegram webhook ---
-    @app_web.route(f'/{TOKEN}', methods=['POST'])
-    def telegram_webhook():
-        json_data = request.get_json(force=True)
-        update = Update.de_json(json_data, app.bot)
-        app.update_queue.put(update)
-        return 'OK'
-
-    # Функция запуска Flask-сервера в отдельном потоке
-    def run():
-        app_web.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
-
-    def keep_alive():
-        t = Thread(target=run)
-        t.start()
-
-    # Установка webhook в Telegram (один раз при старте)
-    def set_webhook():
-        webhook_url = f"https://moex-telegram-bot-sra8.onrender.com/{TOKEN}"
-        resp = requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook", params={"url": webhook_url})
-        if resp.status_code == 200:
-            print("Webhook установлен успешно!")
-        else:
-            print(f"Ошибка установки webhook: {resp.text}")
-
-    if __name__ == "__main__":
-        keep_alive()
-        set_webhook()
-        # ** Важно: не вызываем app.run_polling() при webhook! **
-        # Flask-сервер работает в отдельном потоке, принимает апдейты и передаёт боту
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=8080,
+        webhook_url=f"https://moex-telegram-bot-sra8.onrender.com/{TOKEN}"
+    )
