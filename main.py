@@ -25,7 +25,7 @@ def set_webhook():
         print("Ошибка: TELEGRAM_TOKEN не найден в переменных окружения")
         return
 
-    webhook_url = f"https://moex-telegram-bot-sra8.onrender.com/{token}"
+    webhook_url = f"https://moex-telegram-bot-sra8.onrender.com/"
 
     response = requests.get(
         f"https://api.telegram.org/bot{token}/setWebhook",
