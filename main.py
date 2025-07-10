@@ -822,7 +822,7 @@ def get_figi_by_ticker(ticker: str) -> str | None:
         with Client(TINKOFF_API_TOKEN) as client:
             instruments = client.instruments.shares().instruments
             for instr in instruments:
-                if instr.ticker == ticker and instr.class_code == "TQBR":
+                if instr.ticker == ticker:
                     return instr.figi
         print(f"FIGI не найден для {ticker} в TQBR")
         return None
