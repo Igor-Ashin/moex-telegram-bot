@@ -93,9 +93,6 @@ async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_DELTA_DAYS
 
 
-def get_figi_by_ticker(ticker):
-    search = client.instruments.find_instrument(query=ticker)
-    return search.instruments[0].figi if search.instruments else None
 
 async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу акции с повышенным объёмом…")
@@ -297,7 +294,12 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not df.empty:
                 print(f"{ticker}: {len(df)} свечей | диапазон: {df.index.min()} → {df.index.max()}")
 
-
+            # Только один тикер для проверки
+            df = get_moex_data_4h_tinkoff("MTSS", days=200)
+            if df.empty:
+                await update.message.reply_text("⚠️ Нет данных по MTSS")
+                return
+                
             if df.empty or len(df) < 150:
                 continue
                 
@@ -827,10 +829,11 @@ def plot_stan_chart(df, ticker):
 
 def get_figi_by_ticker(ticker: str) -> str | None:
     try:
-        instruments = client.instruments.shares().instruments
-        for instr in instruments:
-            if instr.ticker == ticker and instr.class_code == "TQBR":
-                return instr.figi
+        with Client(TINKOFF_API_TOKEN) as client:
+            instruments = client.instruments.shares().instruments
+            for instr in instruments:
+                if instr.ticker == ticker and instr.class_code == "TQBR":
+                    return instr.figi
         print(f"FIGI не найден для {ticker} в TQBR")
         return None
     except Exception as e:
@@ -845,12 +848,9 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFr
     """
     try:
         # Получаем FIGI по тикеру
-        search = client.instruments.find_instrument(query=ticker)
-        if not search.instruments:
-            print(f"FIGI для тикера {ticker} не найдено")
-            return pd.DataFrame()
         figi = get_figi_by_ticker(ticker)
         if figi is None:
+            print(f"FIGI для тикера {ticker} не найдено")
             return pd.DataFrame()
 
         to_dt = datetime.utcnow()
