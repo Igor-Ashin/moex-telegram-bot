@@ -40,7 +40,7 @@ SECTORS = {
     "Телеком": ["MTSS", "RTKMP", "RTKM", "MGTSP"],
     "Строители": [ "SMLT", "PIKK", "ETLN", "LSRG"],
     "Ритейл": ["X5", "MGNT", "LENT", "BELU",  "OZON", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID", "VSEH", "FIXP"],
-    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "DVEC", "TGKA", "TGKN", "TGKB", "MSNG", "ELFV"],
+    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "MSNG", "ELFV"],
     "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
     "Агро": ["PHOR", "RAGR", "KZOS", "NKNC", "UFOSP", "KAZT", "AKRN", "NKHP"],
     "Медицина": ["MDMG", "OZPH", "PRMD", "GECO", "APTK", "LIFE", "ABIO", "GEMC"],
@@ -285,21 +285,9 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 50 свечей...")
     long_hits, short_hits = [], []
     today = datetime.today().date()
-    # Проверяем данные по MTSS один раз вне цикла
-    #df_mtss = get_moex_data_4h_tinkoff("MTSS", days=1)
-    #if df_mtss.empty:
-    #    await update.message.reply_text("⚠️ Нет данных по MTSS")
-    #    return
     for ticker in sum(SECTORS.values(), []):
         try:
             df = get_moex_data_4h_tinkoff(ticker, days=25)  # достаточно для расчета EMA
-            #print(f"{ticker}: {len(df)} свечей")
-            # 👇 ВСТАВЬ ЭТО СЮДА:
-            #if not df.empty:
-            #    print(f"{ticker}: {len(df)} свечей | диапазон: {df.index.min()} → {df.index.max()}")
-            #    
-            #if df.empty or len(df) < 100:
-            #    continue
                 
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
@@ -348,10 +336,14 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Ошибка EMA для {ticker}: {e}")
             continue
-    
+            
+
     # Сортировка по дате (новые вверх)
     long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
     short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
+
+    long_hits = long_hits[:30]
+    short_hits = short_hits[:30]
     
     # Формируем сообщение
     msg = ""
@@ -1551,15 +1543,6 @@ if ApplicationBuilder:
         print("Ошибка: переменная окружения TELEGRAM_TOKEN не установлена.")
     else:
         keep_alive()  # ← запуск Flask
-
-        # Тест получения данных до запуска бота
-       # df_mtss = get_moex_data_4h_tinkoff("MTSS", days=1)
-       # if df_mtss.empty:
-       #     print("❌ Нет данных по MTSS!")
-       # else:
-       #     print(f"✅ Получено {len(df_mtss)} 4H свечей для MTSS")
-       #     print(df_mtss.head())
-        
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("chart_hv", chart_hv))
