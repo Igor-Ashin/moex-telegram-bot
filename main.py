@@ -304,90 +304,150 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 25 свечей...")
-    print("▶ Запущена команда EMA CROSS")  # ← вот это
-
-    for ticker in sum(SECTORS.values(), []):
-        print(f"🔁 Обрабатываем {ticker}")
+    try:
+        await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 25 свечей...")
+        print("▶ Запущена команда EMA CROSS")
         
-    long_hits, short_hits = [], []
-    today = datetime.today().date()
-    for ticker in sum(SECTORS.values(), []):
-        try:
-            #df = get_moex_data_4h_tinkoff(ticker, days=25)  # достаточно для расчета EMA
-            df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25)
-                
-            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
-            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
-            
-            # Получаем данные за последние 15 дней для анализа
-            recent = df.tail(26)  # 25 свечей + текущий
-            
-            # Текущие значения
-            current_close = df['close'].iloc[-1]
-            current_ema20 = df['EMA20'].iloc[-1]
-            current_ema50 = df['EMA50'].iloc[-1]
-            
-            # Проверяем пересечения за последние 14 дней
-            for i in range(1, len(recent)):
-                prev_ema20 = recent['EMA20'].iloc[i-1]
-                prev_ema50 = recent['EMA50'].iloc[i-1]
-                curr_ema20 = recent['EMA20'].iloc[i]
-                curr_ema50 = recent['EMA50'].iloc[i]
-                curr_close = recent['close'].iloc[i]  # Цена в день пересечения
-                
-                # Получаем дату для текущего дня
-                date = recent.index[i].strftime('%d.%m.%Y %H:%M')
-                
-                # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
-                if (
-                    prev_ema20 <= prev_ema50
-                    and curr_ema20 > curr_ema50
-                    and curr_close > curr_ema20
-                    and current_close > current_ema20
-                    and current_ema20 > current_ema50
-                ):
-                    long_hits.append((ticker, date))
-                    break  # Только одно пересечение за период
+        # Контроль времени выполнения
+        start_time = datetime.now()
+        MAX_EXECUTION_TIME = 300  # 5 минут
         
-                # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
-                elif (
-                    prev_ema20 >= prev_ema50
-                    and curr_ema20 < curr_ema50
-                    and curr_close < curr_ema20
-                    and current_close < current_ema20
-                    and current_ema20 < current_ema50
-                ):
-                    short_hits.append((ticker, date))
-                    break  # Только одно пересечение за период
+        all_tickers = sum(SECTORS.values(), [])
+        print(f"🔁 Всего тикеров для обработки: {len(all_tickers)}")
+        
+        long_hits, short_hits = [], []
+        processed_count = 0
+        
+        # Обрабатываем тикеры с ограничением по времени
+        for ticker in all_tickers:
+            # Проверка времени выполнения
+            if (datetime.now() - start_time).seconds > MAX_EXECUTION_TIME:
+                print(f"⏰ Превышено максимальное время выполнения ({MAX_EXECUTION_TIME} сек)")
+                break
+                
+            try:
+                print(f"🔁 Обрабатываем {ticker} ({processed_count + 1}/{len(all_tickers)})")
+                
+                # Добавляем timeout для каждого тикера
+                df = await asyncio.wait_for(
+                    asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25),
+                    timeout=10.0  # 10 секунд на каждый тикер
+                )
+                
+                if df.empty:
+                    print(f"❌ Пустые данные для {ticker}")
+                    continue
                     
-        except Exception as e:
-            print(f"Ошибка EMA для {ticker}: {e}")
-            continue
-            
-
-    # Сортировка по дате (новые вверх)
-    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
-    short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
-
-    long_hits = long_hits[:30]
-    short_hits = short_hits[:30]
-    
-    # Формируем сообщение
-    msg = ""
-    if long_hits:
-        msg += f"🟢 *Лонг пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(long_hits)}:*\n"
-        msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
-    else:
-        msg += "🟢 *Лонг сигналов не найдено за последние 50 4Ч свечей*\n\n"
+                # Проверяем минимальное количество данных
+                if len(df) < 50:
+                    print(f"❌ Недостаточно данных для {ticker}: {len(df)} свечей")
+                    continue
+                
+                df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+                df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+                
+                # Получаем данные за последние 26 свечей для анализа
+                recent = df.tail(26)
+                
+                # Текущие значения
+                current_close = df['close'].iloc[-1]
+                current_ema20 = df['EMA20'].iloc[-1]
+                current_ema50 = df['EMA50'].iloc[-1]
+                
+                # Проверяем пересечения за последний период
+                for i in range(1, len(recent)):
+                    try:
+                        prev_ema20 = recent['EMA20'].iloc[i-1]
+                        prev_ema50 = recent['EMA50'].iloc[i-1]
+                        curr_ema20 = recent['EMA20'].iloc[i]
+                        curr_ema50 = recent['EMA50'].iloc[i]
+                        curr_close = recent['close'].iloc[i]
+                        
+                        # Получаем дату для текущего дня
+                        date = recent.index[i].strftime('%d.%m.%Y %H:%M')
+                        
+                        # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
+                        if (
+                            prev_ema20 <= prev_ema50
+                            and curr_ema20 > curr_ema50
+                            and curr_close > curr_ema20
+                            and current_close > current_ema20
+                            and current_ema20 > current_ema50
+                        ):
+                            long_hits.append((ticker, date))
+                            print(f"✅ Лонг сигнал: {ticker} на {date}")
+                            break
+                
+                        # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
+                        elif (
+                            prev_ema20 >= prev_ema50
+                            and curr_ema20 < curr_ema50
+                            and curr_close < curr_ema20
+                            and current_close < current_ema20
+                            and current_ema20 < current_ema50
+                        ):
+                            short_hits.append((ticker, date))
+                            print(f"✅ Шорт сигнал: {ticker} на {date}")
+                            break
+                    except Exception as inner_e:
+                        print(f"❌ Ошибка при анализе пересечений для {ticker}: {inner_e}")
+                        continue
+                        
+                processed_count += 1
+                
+                # Небольшая задержка между запросами
+                await asyncio.sleep(0.1)
+                
+            except asyncio.TimeoutError:
+                print(f"⏰ Таймаут для {ticker}")
+                continue
+            except Exception as e:
+                print(f"❌ Ошибка EMA для {ticker}: {e}")
+                continue
         
-    if short_hits:
-        msg += f"🔴 *Шорт пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(short_hits)}:*\n"
-        msg += "\n".join(f"{t} {d}" for t, d in short_hits)
-    else:
-        msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*"
-    
-    await update.message.reply_text(msg, parse_mode="Markdown")
+        print(f"✅ Обработано тикеров: {processed_count}/{len(all_tickers)}")
+        
+        # Сортировка по дате (новые вверх)
+        try:
+            long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
+            short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
+        except Exception as e:
+            print(f"❌ Ошибка сортировки: {e}")
+        
+        # Ограничиваем количество результатов
+        long_hits = long_hits[:30]
+        short_hits = short_hits[:30]
+        
+        # Формируем сообщение
+        execution_time = (datetime.now() - start_time).seconds
+        msg = f"📊 *Анализ завершен* (обработано {processed_count} тикеров за {execution_time} сек)\n\n"
+        
+        if long_hits:
+            msg += f"🟢 *Лонг пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(long_hits)}:*\n"
+            msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
+        else:
+            msg += "🟢 *Лонг сигналов не найдено за последние 25 4Ч свечей*\n\n"
+            
+        if short_hits:
+            msg += f"🔴 *Шорт пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(short_hits)}:*\n"
+            msg += "\n".join(f"{t} {d}" for t, d in short_hits)
+        else:
+            msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*"
+        
+        # Отправляем результат
+        await update.message.reply_text(msg, parse_mode="Markdown")
+        print("✅ Команда EMA CROSS завершена успешно")
+        
+    except Exception as main_e:
+        print(f"❌ Критическая ошибка в команде EMA CROSS: {main_e}")
+        try:
+            await update.message.reply_text(
+                "❌ Произошла ошибка при анализе пересечений EMA. Попробуйте позже.",
+                parse_mode="Markdown"
+            )
+        except:
+            print("❌ Не удалось отправить сообщение об ошибке")
+
 
 
 async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -867,13 +927,14 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFra
     try:
         figi = get_figi_by_ticker(ticker)
         if figi is None:
-            print(f"FIGI для тикера {ticker} не найдено")
+            print(f"❌ FIGI для тикера {ticker} не найдено")
             return pd.DataFrame()
-        print(f"Используем FIGI {figi} для загрузки данных {ticker}")
-
+            
+        print(f"📡 Используем FIGI {figi} для загрузки данных {ticker}")
+        
         to_dt = datetime.utcnow()
         from_dt = to_dt - timedelta(days=days)
-
+        
         with Client(TINKOFF_API_TOKEN) as client:
             candles_response = client.market_data.get_candles(
                 figi=figi,
@@ -881,36 +942,51 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFra
                 to=to_dt,
                 interval=CandleInterval.CANDLE_INTERVAL_4_HOUR,
             )
-
+            
+        if not candles_response.candles:
+            print(f"❌ Нет данных свечей для {ticker}")
+            return pd.DataFrame()
+        
         data = []
         for c in candles_response.candles:
-            open_p = c.open.units + c.open.nano / 1e9
-            high_p = c.high.units + c.high.nano / 1e9
-            low_p = c.low.units + c.low.nano / 1e9
-            close_p = c.close.units + c.close.nano / 1e9
-            volume = c.volume
-            timestamp = pd.to_datetime(c.time)
-            data.append({
-                "time": timestamp,
-                "open": open_p,
-                "high": high_p,
-                "low": low_p,
-                "close": close_p,
-                "volume": volume
-            })
-
+            try:
+                open_p = c.open.units + c.open.nano / 1e9
+                high_p = c.high.units + c.high.nano / 1e9
+                low_p = c.low.units + c.low.nano / 1e9
+                close_p = c.close.units + c.close.nano / 1e9
+                volume = c.volume
+                timestamp = pd.to_datetime(c.time)
+                
+                data.append({
+                    "time": timestamp,
+                    "open": open_p,
+                    "high": high_p,
+                    "low": low_p,
+                    "close": close_p,
+                    "volume": volume
+                })
+            except Exception as candle_e:
+                print(f"❌ Ошибка обработки свечи для {ticker}: {candle_e}")
+                continue
+                
+        if not data:
+            print(f"❌ Нет валидных данных для {ticker}")
+            return pd.DataFrame()
+            
         df = pd.DataFrame(data)
         df["time"] = pd.to_datetime(df["time"])
         df = df.set_index("time").sort_index()
+        
+        # Обработка временных зон
         if df.index.tz is None:
             df.index = df.index.tz_localize('UTC')
         df.index = df.index.tz_convert('Europe/Moscow')
-        # Переводим в московское время
-        #df.index = df.index.dt.tz_convert("Europe/Moscow")
+        
+        print(f"✅ Загружено {len(df)} свечей для {ticker}")
         return df
-
+        
     except Exception as e:
-        print(f"Ошибка получения данных для {ticker}: {e}")
+        print(f"❌ Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
 
 # Получение данных с MOEX
