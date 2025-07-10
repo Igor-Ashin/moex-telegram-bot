@@ -282,7 +282,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 50 свечей...")
+    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 25 свечей...")
     long_hits, short_hits = [], []
     today = datetime.today().date()
     for ticker in sum(SECTORS.values(), []):
@@ -293,7 +293,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
             
             # Получаем данные за последние 15 дней для анализа
-            recent = df.tail(51)  # 50 свечей + текущий
+            recent = df.tail(26)  # 25 свечей + текущий
             
             # Текущие значения
             current_close = df['close'].iloc[-1]
@@ -348,16 +348,16 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Формируем сообщение
     msg = ""
     if long_hits:
-        msg += f"🟢 *Лонг пересечение EMA20×50 за последние 50 4Ч свечей, всего: {len(long_hits)}:*\n"
+        msg += f"🟢 *Лонг пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(long_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
     else:
         msg += "🟢 *Лонг сигналов не найдено за последние 50 4Ч свечей*\n\n"
         
     if short_hits:
-        msg += f"🔴 *Шорт пересечение EMA20×50 за последние 50 4Ч свечей, всего: {len(short_hits)}:*\n"
+        msg += f"🔴 *Шорт пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(short_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in short_hits)
     else:
-        msg += "🔴 *Шорт сигналов не найдено за последние 50 4Ч свечей*"
+        msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
 
