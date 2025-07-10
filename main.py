@@ -55,17 +55,17 @@ except ModuleNotFoundError:
     ContextTypes = None
 
 SECTORS = {
-    "Финансы": ["SBER", "T", "VTBR", "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS", "CARM", "ZAYM", "CBOM", "MGKL"],
+    "Финансы": ["SBER", "T", "VTBR", "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS", "CARM", "ZAYM", "MGKL"],
     "Нефтегаз": ["GAZP", "NVTK", "LKOH", "ROSN", "TATNP", "TATN", "SNGS", "SNGSP", "BANE", "BANEP", "RNFT"],
-    "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP", "MTLR", "VSMO", "RASP", "SELG", "PLZL", "UGLD", "SGZH"],
+    "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP", "MTLR", "RASP", "PLZL", "UGLD", "SGZH"],
     "IT": ["YDEX", "DATA", "HEAD", "POSI", "VKCO", "ASTR", "IVAT", "DELI", "WUSH", "CNRU", "DIAS", "SOFL", "ELMT"],
     "Телеком": ["MTSS", "RTKMP", "RTKM", "MGTSP"],
     "Строители": [ "SMLT", "PIKK", "ETLN", "LSRG"],
     "Ритейл": ["X5", "MGNT", "LENT", "BELU",  "OZON", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID", "VSEH", "FIXP"],
-    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKZ", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "ELFV"],
+    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "ELFV"],
     "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
-    "Агро": ["PHOR", "RAGR", "KZOS", "NKNC", "UFOSP", "KAZT", "AKRN", "NKHP"],
-    "Медицина": ["MDMG", "OZPH", "PRMD", "GECO", "APTK", "ABIO", "GEMC"],
+    "Агро": ["PHOR", "RAGR", "KZOS", "AKRN", "NKHP"],
+    "Медицина": ["MDMG", "OZPH", "PRMD", "ABIO", "GEMC"],
     "Машиностроение": ["UWGN", "SVAV", "KMAZ", "UNAC", "IRKT"]
 }
 
@@ -310,7 +310,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Контроль времени выполнения
         start_time = datetime.now()
-        MAX_EXECUTION_TIME = 300  # 5 минут
+        MAX_EXECUTION_TIME = 1500  # 25 минут
         
         all_tickers = sum(SECTORS.values(), [])
         print(f"🔁 Всего тикеров для обработки: {len(all_tickers)}")
