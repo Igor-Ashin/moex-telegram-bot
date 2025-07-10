@@ -286,13 +286,13 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     long_hits, short_hits = [], []
     today = datetime.today().date()
     # Проверяем данные по MTSS один раз вне цикла
-    df_mtss = get_moex_data_4h_tinkoff("MTSS", days=200)
+    df_mtss = get_moex_data_4h_tinkoff("MTSS", days=20)
     if df_mtss.empty:
         await update.message.reply_text("⚠️ Нет данных по MTSS")
         return
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data_4h_tinkoff(ticker, days=200)  # достаточно для расчета EMA
+            df = get_moex_data_4h_tinkoff(ticker, days=20)  # достаточно для расчета EMA
             print(f"{ticker}: {len(df)} свечей")
             # 👇 ВСТАВЬ ЭТО СЮДА:
             if not df.empty:
@@ -839,7 +839,7 @@ def get_figi_by_ticker(ticker: str) -> str | None:
         return None
 
 
-def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFrame:
+def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFrame:
     """
     Загружает 4H свечи по тикеру из Tinkoff Invest API за последние 'days' дней.
     Возвращает DataFrame с индексом по московскому времени и колонками open, high, low, close, volume.
@@ -1553,7 +1553,7 @@ if ApplicationBuilder:
         keep_alive()  # ← запуск Flask
 
         # Тест получения данных до запуска бота
-        df_mtss = get_moex_data_4h_tinkoff("MTSS", days=200)
+        df_mtss = get_moex_data_4h_tinkoff("MTSS", days=20)
         if df_mtss.empty:
             print("❌ Нет данных по MTSS!")
         else:
