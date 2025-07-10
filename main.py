@@ -328,81 +328,51 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 print(f"🔁 Обрабатываем {ticker} ({processed_count + 1}/{len(all_tickers)})")
                 
+                # Принудительно сбрасываем буфер логов
+                import sys
+                sys.stdout.flush()
+                
                 # Добавляем timeout для каждого тикера
-                df = await asyncio.wait_for(
-                    asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25),
-                    timeout=10.0  # 10 секунд на каждый тикер
+                print(f"📡 Запрашиваем данные для {ticker}...")
+                
+                # Оборачиваем ВСЮ обработку тикера в timeout
+                ticker_result = await asyncio.wait_for(
+                    process_single_ticker(ticker),
+                    timeout=20.0  # 20 секунд на весь тикер
                 )
                 
-                if df.empty:
-                    print(f"❌ Пустые данные для {ticker}")
-                    continue
-                    
-                # Проверяем минимальное количество данных
-                if len(df) < 50:
-                    print(f"❌ Недостаточно данных для {ticker}: {len(df)} свечей")
-                    continue
+                if ticker_result:
+                    long_signal, short_signal = ticker_result
+                    if long_signal:
+                        long_hits.append(long_signal)
+                        print(f"✅ Лонг сигнал: {long_signal[0]} на {long_signal[1]}")
+                    if short_signal:
+                        short_hits.append(short_signal)
+                        print(f"✅ Шорт сигнал: {short_signal[0]} на {short_signal[1]}")
                 
-                df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
-                df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
-                
-                # Получаем данные за последние 26 свечей для анализа
-                recent = df.tail(26)
-                
-                # Текущие значения
-                current_close = df['close'].iloc[-1]
-                current_ema20 = df['EMA20'].iloc[-1]
-                current_ema50 = df['EMA50'].iloc[-1]
-                
-                # Проверяем пересечения за последний период
-                for i in range(1, len(recent)):
-                    try:
-                        prev_ema20 = recent['EMA20'].iloc[i-1]
-                        prev_ema50 = recent['EMA50'].iloc[i-1]
-                        curr_ema20 = recent['EMA20'].iloc[i]
-                        curr_ema50 = recent['EMA50'].iloc[i]
-                        curr_close = recent['close'].iloc[i]
-                        
-                        # Получаем дату для текущего дня
-                        date = recent.index[i].strftime('%d.%m.%Y %H:%M')
-                        
-                        # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
-                        if (
-                            prev_ema20 <= prev_ema50
-                            and curr_ema20 > curr_ema50
-                            and curr_close > curr_ema20
-                            and current_close > current_ema20
-                            and current_ema20 > current_ema50
-                        ):
-                            long_hits.append((ticker, date))
-                            print(f"✅ Лонг сигнал: {ticker} на {date}")
-                            break
-                
-                        # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
-                        elif (
-                            prev_ema20 >= prev_ema50
-                            and curr_ema20 < curr_ema50
-                            and curr_close < curr_ema20
-                            and current_close < current_ema20
-                            and current_ema20 < current_ema50
-                        ):
-                            short_hits.append((ticker, date))
-                            print(f"✅ Шорт сигнал: {ticker} на {date}")
-                            break
-                    except Exception as inner_e:
-                        print(f"❌ Ошибка при анализе пересечений для {ticker}: {inner_e}")
-                        continue
-                        
+                print(f"✅ Завершен анализ для {ticker}")
                 processed_count += 1
                 
-                # Небольшая задержка между запросами
-                await asyncio.sleep(0.1)
+                # Отправляем промежуточное уведомление каждые 20 тикеров
+                if processed_count % 20 == 0:
+                    try:
+                        progress_msg = f"⏳ Обработано {processed_count}/{len(all_tickers)} тикеров..."
+                        await update.message.reply_text(progress_msg)
+                        print(f"📱 Отправлено уведомление: {progress_msg}")
+                    except Exception as progress_e:
+                        print(f"❌ Ошибка отправки прогресса: {progress_e}")
+                
+                # Небольшая задержка между запросами + принудительный сброс буфера
+                await asyncio.sleep(0.5)  # Увеличиваем задержку для API Tinkoff
+                sys.stdout.flush()
                 
             except asyncio.TimeoutError:
                 print(f"⏰ Таймаут для {ticker}")
+                sys.stdout.flush()
                 continue
             except Exception as e:
                 print(f"❌ Ошибка EMA для {ticker}: {e}")
+                sys.stdout.flush()
                 continue
         
         print(f"✅ Обработано тикеров: {processed_count}/{len(all_tickers)}")
@@ -447,6 +417,179 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except:
             print("❌ Не удалось отправить сообщение об ошибке")
+
+
+async def process_single_ticker(ticker: str):
+    """
+    Обрабатывает один тикер и возвращает найденные сигналы
+    """
+    try:
+        # Получаем данные
+        df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25)
+        print(f"📊 Данные получены для {ticker}: {len(df) if not df.empty else 0} свечей")
+        
+        if df.empty:
+            print(f"❌ Пустые данные для {ticker}")
+            return None
+            
+        # Проверяем минимальное количество данных
+        if len(df) < 50:
+            print(f"❌ Недостаточно данных для {ticker}: {len(df)} свечей")
+            return None
+        
+        print(f"🧮 Рассчитываем EMA для {ticker}...")
+        # Рассчитываем EMA в отдельном потоке для избежания блокировки
+        def calculate_ema(df):
+            df_copy = df.copy()
+            df_copy['EMA20'] = df_copy['close'].ewm(span=20, adjust=False).mean()
+            df_copy['EMA50'] = df_copy['close'].ewm(span=50, adjust=False).mean()
+            return df_copy
+        
+        df = await asyncio.to_thread(calculate_ema, df)
+        
+        print(f"🔍 Анализируем пересечения для {ticker}...")
+        # Получаем данные за последние 26 свечей для анализа
+        recent = df.tail(26)
+        
+        # Текущие значения
+        current_close = df['close'].iloc[-1]
+        current_ema20 = df['EMA20'].iloc[-1]
+        current_ema50 = df['EMA50'].iloc[-1]
+        
+        long_signal = None
+        short_signal = None
+        
+        # Проверяем пересечения за последний период
+        for i in range(1, len(recent)):
+            try:
+                prev_ema20 = recent['EMA20'].iloc[i-1]
+                prev_ema50 = recent['EMA50'].iloc[i-1]
+                curr_ema20 = recent['EMA20'].iloc[i]
+                curr_ema50 = recent['EMA50'].iloc[i]
+                curr_close = recent['close'].iloc[i]
+                
+                # Получаем дату для текущего дня
+                date = recent.index[i].strftime('%d.%m.%Y %H:%M')
+                
+                # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
+                if (
+                    prev_ema20 <= prev_ema50
+                    and curr_ema20 > curr_ema50
+                    and curr_close > curr_ema20
+                    and current_close > current_ema20
+                    and current_ema20 > current_ema50
+                ):
+                    long_signal = (ticker, date)
+                    break
+        
+                # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
+                elif (
+                    prev_ema20 >= prev_ema50
+                    and curr_ema20 < curr_ema50
+                    and curr_close < curr_ema20
+                    and current_close < current_ema20
+                    and current_ema20 < current_ema50
+                ):
+                    short_signal = (ticker, date)
+                    break
+            except Exception as inner_e:
+                print(f"❌ Ошибка при анализе пересечений для {ticker}: {inner_e}")
+                continue
+        
+        return (long_signal, short_signal)
+        
+    except Exception as e:
+        print(f"❌ Ошибка обработки тикера {ticker}: {e}")
+        return None
+
+
+def get_figi_by_ticker(ticker: str) -> str | None:
+    try:
+        with Client(TINKOFF_API_TOKEN) as client:
+            instruments = client.instruments.shares().instruments
+            for instr in instruments:
+                if instr.ticker == ticker:
+                    return instr.figi
+        print(f"FIGI не найден для {ticker} в TQBR")
+        return None
+    except Exception as e:
+        print(f"Ошибка поиска FIGI для {ticker}: {e}")
+        return None
+
+
+def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFrame:
+    """
+    Загружает 4H свечи по тикеру из Tinkoff Invest API за последние 'days' дней.
+    Возвращает DataFrame с индексом по московскому времени и колонками open, high, low, close, volume.
+    """
+    try:
+        figi = get_figi_by_ticker(ticker)
+        if figi is None:
+            print(f"❌ FIGI для тикера {ticker} не найдено")
+            return pd.DataFrame()
+            
+        print(f"📡 Используем FIGI {figi} для загрузки данных {ticker}")
+        
+        to_dt = datetime.utcnow()
+        from_dt = to_dt - timedelta(days=days)
+        
+        with Client(TINKOFF_API_TOKEN) as client:
+            candles_response = client.market_data.get_candles(
+                figi=figi,
+                from_=from_dt,
+                to=to_dt,
+                interval=CandleInterval.CANDLE_INTERVAL_4_HOUR,
+            )
+            
+        # Добавляем небольшую задержку после каждого API запроса
+        import time
+        time.sleep(0.1)  # 100мс задержка после каждого запроса к API
+            
+        if not candles_response.candles:
+            print(f"❌ Нет данных свечей для {ticker}")
+            return pd.DataFrame()
+        
+        data = []
+        for c in candles_response.candles:
+            try:
+                open_p = c.open.units + c.open.nano / 1e9
+                high_p = c.high.units + c.high.nano / 1e9
+                low_p = c.low.units + c.low.nano / 1e9
+                close_p = c.close.units + c.close.nano / 1e9
+                volume = c.volume
+                timestamp = pd.to_datetime(c.time)
+                
+                data.append({
+                    "time": timestamp,
+                    "open": open_p,
+                    "high": high_p,
+                    "low": low_p,
+                    "close": close_p,
+                    "volume": volume
+                })
+            except Exception as candle_e:
+                print(f"❌ Ошибка обработки свечи для {ticker}: {candle_e}")
+                continue
+                
+        if not data:
+            print(f"❌ Нет валидных данных для {ticker}")
+            return pd.DataFrame()
+            
+        df = pd.DataFrame(data)
+        df["time"] = pd.to_datetime(df["time"])
+        df = df.set_index("time").sort_index()
+        
+        # Обработка временных зон
+        if df.index.tz is None:
+            df.index = df.index.tz_localize('UTC')
+        df.index = df.index.tz_convert('Europe/Moscow')
+        
+        print(f"✅ Загружено {len(df)} свечей для {ticker}")
+        return df
+        
+    except Exception as e:
+        print(f"❌ Ошибка получения данных для {ticker}: {e}")
+        return pd.DataFrame()
 
 
 
@@ -919,75 +1062,6 @@ def get_figi_by_ticker(ticker: str) -> str | None:
         return None
 
 
-def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFrame:
-    """
-    Загружает 4H свечи по тикеру из Tinkoff Invest API за последние 'days' дней.
-    Возвращает DataFrame с индексом по московскому времени и колонками open, high, low, close, volume.
-    """
-    try:
-        figi = get_figi_by_ticker(ticker)
-        if figi is None:
-            print(f"❌ FIGI для тикера {ticker} не найдено")
-            return pd.DataFrame()
-            
-        print(f"📡 Используем FIGI {figi} для загрузки данных {ticker}")
-        
-        to_dt = datetime.utcnow()
-        from_dt = to_dt - timedelta(days=days)
-        
-        with Client(TINKOFF_API_TOKEN) as client:
-            candles_response = client.market_data.get_candles(
-                figi=figi,
-                from_=from_dt,
-                to=to_dt,
-                interval=CandleInterval.CANDLE_INTERVAL_4_HOUR,
-            )
-            
-        if not candles_response.candles:
-            print(f"❌ Нет данных свечей для {ticker}")
-            return pd.DataFrame()
-        
-        data = []
-        for c in candles_response.candles:
-            try:
-                open_p = c.open.units + c.open.nano / 1e9
-                high_p = c.high.units + c.high.nano / 1e9
-                low_p = c.low.units + c.low.nano / 1e9
-                close_p = c.close.units + c.close.nano / 1e9
-                volume = c.volume
-                timestamp = pd.to_datetime(c.time)
-                
-                data.append({
-                    "time": timestamp,
-                    "open": open_p,
-                    "high": high_p,
-                    "low": low_p,
-                    "close": close_p,
-                    "volume": volume
-                })
-            except Exception as candle_e:
-                print(f"❌ Ошибка обработки свечи для {ticker}: {candle_e}")
-                continue
-                
-        if not data:
-            print(f"❌ Нет валидных данных для {ticker}")
-            return pd.DataFrame()
-            
-        df = pd.DataFrame(data)
-        df["time"] = pd.to_datetime(df["time"])
-        df = df.set_index("time").sort_index()
-        
-        # Обработка временных зон
-        if df.index.tz is None:
-            df.index = df.index.tz_localize('UTC')
-        df.index = df.index.tz_convert('Europe/Moscow')
-        
-        print(f"✅ Загружено {len(df)} свечей для {ticker}")
-        return df
-        
-    except Exception as e:
-        print(f"❌ Ошибка получения данных для {ticker}: {e}")
-        return pd.DataFrame()
 
 # Получение данных с MOEX
 def get_moex_data(ticker="SBER", days=120):
