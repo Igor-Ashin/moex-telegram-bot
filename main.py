@@ -856,12 +856,13 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFr
         to_dt = datetime.utcnow()
         from_dt = to_dt - timedelta(days=days)
 
-        candles_response = client.market_data.get_candles(
-            figi=figi,
-            from_=from_dt,
-            to=to_dt,
-            interval=CandleInterval.CANDLE_INTERVAL_4H,
-        )
+        with Client(TINKOFF_API_TOKEN) as client:
+            candles_response = client.market_data.get_candles(
+                figi=figi,
+                from_=from_dt,
+                to=to_dt,
+                interval=CandleInterval.CANDLE_INTERVAL_4H,
+            )
 
         data = []
         for c in candles_response.candles:
