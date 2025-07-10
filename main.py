@@ -825,6 +825,19 @@ def plot_stan_chart(df, ticker):
         plt.close()
         return None
 
+def get_figi_by_ticker(ticker: str) -> str | None:
+    try:
+        instruments = client.instruments.shares().instruments
+        for instr in instruments:
+            if instr.ticker == ticker and instr.class_code == "TQBR":
+                return instr.figi
+        print(f"FIGI не найден для {ticker} в TQBR")
+        return None
+    except Exception as e:
+        print(f"Ошибка поиска FIGI для {ticker}: {e}")
+        return None
+
+
 def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFrame:
     """
     Загружает 4H свечи по тикеру из Tinkoff Invest API за последние 'days' дней.
@@ -836,7 +849,9 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFr
         if not search.instruments:
             print(f"FIGI для тикера {ticker} не найдено")
             return pd.DataFrame()
-        figi = search.instruments[0].figi
+        figi = get_figi_by_ticker(ticker)
+        if figi is None:
+            continue
 
         to_dt = datetime.utcnow()
         from_dt = to_dt - timedelta(days=days)
