@@ -314,7 +314,8 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = datetime.today().date()
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data_4h_tinkoff(ticker, days=25)  # достаточно для расчета EMA
+            #df = get_moex_data_4h_tinkoff(ticker, days=25)  # достаточно для расчета EMA
+            df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25)
                 
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
