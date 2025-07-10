@@ -342,8 +342,8 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
     short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
 
-    #long_hits = long_hits[:30]
-    #short_hits = short_hits[:30]
+    long_hits = long_hits[:30]
+    short_hits = short_hits[:30]
     
     # Формируем сообщение
     msg = ""
