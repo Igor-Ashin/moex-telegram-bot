@@ -60,7 +60,7 @@ SECTORS = {
     "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP", "MTLR", "RASP", "PLZL", "UGLD", "SGZH"],
     "IT": ["YDEX", "DATA", "HEAD", "POSI", "VKCO", "ASTR", "IVAT", "DELI", "WUSH", "CNRU", "DIAS", "SOFL", "ELMT"],
     "Телеком": ["MTSS", "RTKMP", "RTKM", "MGTSP"],
-    "Строители": [ "SMLT", "PIKK", "ETLN", "LSRG"],
+    "Строители": [ "SMLT", "PIKK", "LSRG"],
     "Ритейл": ["X5", "MGNT", "LENT", "BELU",  "OZON", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID", "VSEH", "FIXP"],
     "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKU", "MRKC", "MRKP", "FEES", "HYDR", "ELFV"],
     "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
