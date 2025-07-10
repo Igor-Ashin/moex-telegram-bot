@@ -286,19 +286,19 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     long_hits, short_hits = [], []
     today = datetime.today().date()
     # Проверяем данные по MTSS один раз вне цикла
-    df_mtss = get_moex_data_4h_tinkoff("MTSS", days=20)
+    df_mtss = get_moex_data_4h_tinkoff("MTSS", days=1)
     if df_mtss.empty:
         await update.message.reply_text("⚠️ Нет данных по MTSS")
         return
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data_4h_tinkoff(ticker, days=20)  # достаточно для расчета EMA
+            df = get_moex_data_4h_tinkoff(ticker, days=25)  # достаточно для расчета EMA
             print(f"{ticker}: {len(df)} свечей")
             # 👇 ВСТАВЬ ЭТО СЮДА:
             if not df.empty:
                 print(f"{ticker}: {len(df)} свечей | диапазон: {df.index.min()} → {df.index.max()}")
                 
-            if df.empty or len(df) < 150:
+            if df.empty or len(df) < 100:
                 continue
                 
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
@@ -1553,7 +1553,7 @@ if ApplicationBuilder:
         keep_alive()  # ← запуск Flask
 
         # Тест получения данных до запуска бота
-        df_mtss = get_moex_data_4h_tinkoff("MTSS", days=20)
+        df_mtss = get_moex_data_4h_tinkoff("MTSS", days=1)
         if df_mtss.empty:
             print("❌ Нет данных по MTSS!")
         else:
