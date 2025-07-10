@@ -19,6 +19,28 @@ TINKOFF_API_TOKEN = os.getenv("TINKOFF_API_TOKEN")
 client = Client(TINKOFF_API_TOKEN)
 
 
+def set_webhook():
+    token = os.getenv("TELEGRAM_TOKEN")  # Берем токен из env
+    if not token:
+        print("Ошибка: TELEGRAM_TOKEN не найден в переменных окружения")
+        return
+
+    webhook_url = f"https://moex-telegram-bot-sra8.onrender.com/{token}"
+
+    response = requests.get(
+        f"https://api.telegram.org/bot{token}/setWebhook",
+        params={"url": webhook_url}
+    )
+
+    if response.status_code == 200:
+        print("Webhook установлен успешно!")
+    else:
+        print(f"Ошибка при установке webhook: {response.text}")
+
+if __name__ == "__main__":
+    set_webhook()
+
+
 
 # Заменяем telegram на условный заглушку или комментарий, чтобы избежать ошибки в окружении
 try:
@@ -1527,6 +1549,11 @@ if Update and ContextTypes:
 # ==== Flask сервер для поддержки работы 24/7 ====
 from flask import Flask
 from threading import Thread
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
+    ConversationHandler, MessageHandler, filters
+)
 
 app_web = Flask('')
 
@@ -1534,54 +1561,75 @@ app_web = Flask('')
 def home():
     return "Бот работает!"
 
-def run():
-    app_web.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
-
-# ==== Запуск Telegram-бота с веб-сервером ====
-if ApplicationBuilder:
-    TOKEN = os.getenv("TELEGRAM_TOKEN")
-    if TOKEN is None:
-        print("Ошибка: переменная окружения TELEGRAM_TOKEN не установлена.")
-    else:
-        keep_alive()  # ← запуск Flask
-        app = ApplicationBuilder().token(TOKEN).build()
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("chart_hv", chart_hv))
-        app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
-        app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
-        app.add_handler(CommandHandler("stan", stan))
-        app.add_handler(CommandHandler("stan_recent", stan_recent))
-        app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
-        app.add_handler(CommandHandler("stan_recent_week", stan_recent_week))
-        app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
-        app.add_handler(CommandHandler("high_volume", high_volume))
-        app.add_handler(CommandHandler("rsi_top", rsi_top))
-        app.add_handler(CallbackQueryHandler(handle_callback))
-        delta_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("delta", ask_ticker)],
-            states={
-                ASK_TICKER: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticker)],
-                ASK_DELTA_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_delta_days)]
-            },
-            fallbacks=[],
-        )
-        app.add_handler(delta_conv_handler)
-
-        # === Хендлер с диалогом выбора дней ===
-        conv_handler = ConversationHandler(
-            entry_points=[CommandHandler("moneyflow", ask_days)],
-            states={
-                ASK_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_days)]
-            },
-            fallbacks=[],
-        )
-        app.add_handler(conv_handler)
-        
-        print("✅ Бот запущен и поддерживается Flask-сервером.")
-        app.run_polling()
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+if TOKEN is None:
+    print("Ошибка: переменная окружения TELEGRAM_TOKEN не установлена.")
 else:
-    print("Функциональность Telegram-бота отключена из-за отсутствия библиотеки 'telegram'.")
+    # Создаем экземпляр бота
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    # Регистрируем хендлеры
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("chart_hv", chart_hv))
+    app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
+    app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
+    app.add_handler(CommandHandler("stan", stan))
+    app.add_handler(CommandHandler("stan_recent", stan_recent))
+    app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
+    app.add_handler(CommandHandler("stan_recent_week", stan_recent_week))
+    app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
+    app.add_handler(CommandHandler("high_volume", high_volume))
+    app.add_handler(CommandHandler("rsi_top", rsi_top))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+
+    delta_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("delta", ask_ticker)],
+        states={
+            ASK_TICKER: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ticker)],
+            ASK_DELTA_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_delta_days)]
+        },
+        fallbacks=[],
+    )
+    app.add_handler(delta_conv_handler)
+
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("moneyflow", ask_days)],
+        states={
+            ASK_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_days)]
+        },
+        fallbacks=[],
+    )
+    app.add_handler(conv_handler)
+
+    print("✅ Бот запущен и поддерживается Flask-сервером.")
+
+    # --- Flask route для Telegram webhook ---
+    @app_web.route(f'/{TOKEN}', methods=['POST'])
+    def telegram_webhook():
+        json_data = request.get_json(force=True)
+        update = Update.de_json(json_data, app.bot)
+        app.update_queue.put(update)
+        return 'OK'
+
+    # Функция запуска Flask-сервера в отдельном потоке
+    def run():
+        app_web.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
+    def keep_alive():
+        t = Thread(target=run)
+        t.start()
+
+    # Установка webhook в Telegram (один раз при старте)
+    def set_webhook():
+        webhook_url = f"https://moex-telegram-bot-sra8.onrender.com/{TOKEN}"
+        resp = requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook", params={"url": webhook_url})
+        if resp.status_code == 200:
+            print("Webhook установлен успешно!")
+        else:
+            print(f"Ошибка установки webhook: {resp.text}")
+
+    if __name__ == "__main__":
+        keep_alive()
+        set_webhook()
+        # ** Важно: не вызываем app.run_polling() при webhook! **
+        # Flask-сервер работает в отдельном потоке, принимает апдейты и передаёт боту
