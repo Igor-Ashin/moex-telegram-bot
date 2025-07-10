@@ -1547,7 +1547,7 @@ if Update and ContextTypes:
             await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Произошла ошибка: {str(e)}")
 
 # ==== Flask сервер для поддержки работы 24/7 ====
-from flask import Flask
+from flask import Flask, request
 from threading import Thread
 from telegram import Update
 from telegram.ext import (
