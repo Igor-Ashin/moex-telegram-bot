@@ -283,11 +283,16 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 25 свечей...")
+    print("▶ Запущена команда EMA CROSS")  # ← вот это
+
+    for ticker in sum(SECTORS.values(), []):
+        print(f"🔁 Обрабатываем {ticker}")
+        
     long_hits, short_hits = [], []
     today = datetime.today().date()
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25)  # достаточно для расчета EMA
+            df = get_moex_data_4h_tinkoff(ticker, days=25)  # достаточно для расчета EMA
                 
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
