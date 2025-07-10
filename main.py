@@ -851,7 +851,7 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFr
             return pd.DataFrame()
         figi = get_figi_by_ticker(ticker)
         if figi is None:
-            continue
+            return pd.DataFrame()
 
         to_dt = datetime.utcnow()
         from_dt = to_dt - timedelta(days=days)
