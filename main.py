@@ -1607,5 +1607,6 @@ if __name__ == '__main__':
     app.run_webhook(
         listen="0.0.0.0",
         port=8080,
+        url_path=TOKEN, 
         webhook_url=f"https://moex-telegram-bot-sra8.onrender.com/{TOKEN}"
     )
