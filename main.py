@@ -292,6 +292,12 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for ticker in sum(SECTORS.values(), []):
         try:
             df = get_moex_data_4h_tinkoff(ticker, days=200)  # достаточно для расчета EMA
+            print(f"{ticker}: {len(df)} свечей")
+            # 👇 ВСТАВЬ ЭТО СЮДА:
+            if not df.empty:
+                print(f"{ticker}: {len(df)} свечей | диапазон: {df.index.min()} → {df.index.max()}")
+
+
             if df.empty or len(df) < 150:
                 continue
                 
@@ -859,8 +865,9 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFr
                 "volume": volume
             })
 
-        df = pd.DataFrame(data).set_index("time").sort_index()
-        #df.index = df.index.dt.tz_localize('UTC').dt.tz_convert('Europe/Moscow')
+        df = pd.DataFrame(data)
+        df["time"] = pd.to_datetime(df["time"])
+        df = df.set_index("time").sort_index()
         if df.index.tz is None:
             df.index = df.index.tz_localize('UTC')
         df.index = df.index.tz_convert('Europe/Moscow')
