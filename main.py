@@ -859,7 +859,7 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFra
                 figi=figi,
                 from_=from_dt,
                 to=to_dt,
-                interval=CandleInterval.CANDLE_INTERVAL_4H,
+                interval=CandleInterval.CANDLE_INTERVAL_4_HOUR,
             )
 
         data = []
