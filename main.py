@@ -285,7 +285,11 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 50 свечей...")
     long_hits, short_hits = [], []
     today = datetime.today().date()
-    
+    # Проверяем данные по MTSS один раз вне цикла
+    df_mtss = get_moex_data_4h_tinkoff("MTSS", days=200)
+    if df_mtss.empty:
+        await update.message.reply_text("⚠️ Нет данных по MTSS")
+        return
     for ticker in sum(SECTORS.values(), []):
         try:
             df = get_moex_data_4h_tinkoff(ticker, days=200)  # достаточно для расчета EMA
@@ -293,12 +297,6 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 👇 ВСТАВЬ ЭТО СЮДА:
             if not df.empty:
                 print(f"{ticker}: {len(df)} свечей | диапазон: {df.index.min()} → {df.index.max()}")
-
-            # Только один тикер для проверки
-            df = get_moex_data_4h_tinkoff("MTSS", days=200)
-            if df.empty:
-                await update.message.reply_text("⚠️ Нет данных по MTSS")
-                return
                 
             if df.empty or len(df) < 150:
                 continue
@@ -847,11 +845,11 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 200) -> pd.DataFr
     Возвращает DataFrame с индексом по московскому времени и колонками open, high, low, close, volume.
     """
     try:
-        # Получаем FIGI по тикеру
         figi = get_figi_by_ticker(ticker)
         if figi is None:
             print(f"FIGI для тикера {ticker} не найдено")
             return pd.DataFrame()
+        print(f"Используем FIGI {figi} для загрузки данных {ticker}")
 
         to_dt = datetime.utcnow()
         from_dt = to_dt - timedelta(days=days)
@@ -1553,6 +1551,15 @@ if ApplicationBuilder:
         print("Ошибка: переменная окружения TELEGRAM_TOKEN не установлена.")
     else:
         keep_alive()  # ← запуск Flask
+
+        # Тест получения данных до запуска бота
+        df_mtss = get_moex_data_4h_tinkoff("MTSS", days=200)
+        if df_mtss.empty:
+            print("❌ Нет данных по MTSS!")
+        else:
+            print(f"✅ Получено {len(df_mtss)} 4H свечей для MTSS")
+            print(df_mtss.head())
+        
         app = ApplicationBuilder().token(TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("chart_hv", chart_hv))
