@@ -321,7 +321,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tickers_summary = []
         if long_hits:
             long_tickers = ", ".join(t for t, _ in long_hits)
-            tickers_summary.append(f";*Лонг:* {long_tickers}")
+            tickers_summary.append(f"\n*Лонг:* {long_tickers}")
         if short_hits:
             short_tickers = ", ".join(t for t, _ in short_hits)
             tickers_summary.append(f"*Шорт:* {short_tickers}")
@@ -436,7 +436,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             tickers_summary = []
             if long_hits:
                 long_tickers = ", ".join(t for t, _ in long_hits)
-                tickers_summary.append(f"*Лонг:* {long_tickers}")
+                tickers_summary.append(f"\n*Лонг:* {long_tickers}")
             if short_hits:
                 short_tickers = ", ".join(t for t, _ in short_hits)
                 tickers_summary.append(f"*Шорт:* {short_tickers}")
