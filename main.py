@@ -112,7 +112,7 @@ async def receive_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def ask_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Запрашивает тикер у пользователя"""
-    await update.message.reply_text("📊 Введите тикер акции (например, SBER):")
+    await update.message.reply_text("📊 Введите тикер (или список тикеров) акции (например, SBER):")
     return ASK_TICKER
 
 async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -313,19 +313,19 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"🔴 *Шорт пересечение EMA20×50 за последние 14 дней, всего: {len(short_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in short_hits)
     else:
-        msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*"
+        msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*\n"
 
     # Добавляем итоговый список тикеров внизу
     if long_hits or short_hits:
         tickers_summary = []
         if long_hits:
             long_tickers = ", ".join(t for t, _ in long_hits)
-            tickers_summary.append(f"Лонг: {long_tickers}")
+            tickers_summary.append(f";*Лонг:* {long_tickers}")
         if short_hits:
             short_tickers = ", ".join(t for t, _ in short_hits)
-            tickers_summary.append(f"Шорт: {short_tickers}")
+            tickers_summary.append(f"*Шорт:* {short_tickers}")
         msg += "\n" + "\n".join(tickers_summary)
-    
+
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 
@@ -428,17 +428,17 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += f"🔴 *Шорт пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(short_hits)}:*\n"
             msg += "\n".join(f"{t} {d}" for t, d in short_hits)
         else:
-            msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*"
+            msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*\n"
 
         # Добавляем итоговый список тикеров внизу
         if long_hits or short_hits:
             tickers_summary = []
             if long_hits:
                 long_tickers = ", ".join(t for t, _ in long_hits)
-                tickers_summary.append(f"Лонг: {long_tickers}")
+                tickers_summary.append(f"*Лонг:* {long_tickers}")
             if short_hits:
                 short_tickers = ", ".join(t for t, _ in short_hits)
-                tickers_summary.append(f"Шорт: {short_tickers}")
+                tickers_summary.append(f"*Шорт:* {short_tickers}")
             msg += "\n" + "\n".join(tickers_summary)
         
         # Отправляем результат
