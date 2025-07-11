@@ -116,17 +116,17 @@ async def ask_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_TICKER
 
 async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получает тикер и запрашивает количество дней"""
-    ticker = update.message.text.strip().upper()
+    """Получает тикер (или список тикеров) и запрашивает количество дней"""
+    ticker_input = update.message.text.strip().upper()
     
     # Проверяем, что тикер существует в наших секторах
-    all_tickers = sum(SECTORS.values(), [])
-    if ticker not in all_tickers:
-        await update.message.reply_text(f"⚠️ Тикер '{ticker}' не найден в базе данных. Проверьте правильность написания.")
+    #all_tickers = sum(SECTORS.values(), [])
+    if not ticker_input:
+        await update.message.reply_text("⚠️ Введите один или несколько тикеров через запятую.")
         return ASK_TICKER
     
-    context.user_data['delta_ticker'] = ticker
-    await update.message.reply_text(f"✅ Вы ввели тикер: {ticker}\n\n📅 Введите количество дней для расчета дельты денежного потока (например, 10):")
+    context.user_data['delta_ticker'] = ticker_input
+    await update.message.reply_text("📅 Укажите, за сколько дней рассчитать дельту (1–100):")
     return ASK_DELTA_DAYS
 
 
@@ -314,6 +314,17 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "\n".join(f"{t} {d}" for t, d in short_hits)
     else:
         msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*"
+
+    # Добавляем итоговый список тикеров внизу
+    if long_hits or short_hits:
+        tickers_summary = []
+        if long_hits:
+            long_tickers = ", ".join(t for t, _ in long_hits)
+            tickers_summary.append(f"Лонг: {long_tickers}")
+        if short_hits:
+            short_tickers = ", ".join(t for t, _ in short_hits)
+            tickers_summary.append(f"Шорт: {short_tickers}")
+        msg += "\n" + "\n".join(tickers_summary)
     
     await update.message.reply_text(msg, parse_mode="Markdown")
 
@@ -418,6 +429,17 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += "\n".join(f"{t} {d}" for t, d in short_hits)
         else:
             msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*"
+
+        # Добавляем итоговый список тикеров внизу
+        if long_hits or short_hits:
+            tickers_summary = []
+            if long_hits:
+                long_tickers = ", ".join(t for t, _ in long_hits)
+                tickers_summary.append(f"Лонг: {long_tickers}")
+            if short_hits:
+                short_tickers = ", ".join(t for t, _ in short_hits)
+                tickers_summary.append(f"Шорт: {short_tickers}")
+            msg += "\n" + "\n".join(tickers_summary)
         
         # Отправляем результат
         await update.message.reply_text(msg, parse_mode="Markdown")
@@ -616,9 +638,21 @@ async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text("⚠️ Введите число от 1 до 100.")
             return ASK_DELTA_DAYS
 
-        ticker = context.user_data['delta_ticker']
-        await calculate_single_delta(update, context, ticker, days)
+        ticker_input = context.user_data['delta_ticker']  # Тут может быть строка типа: BSPB, RTKM, POSI
+        tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
+
+        if not tickers:
+            await update.message.reply_text("⚠️ Не удалось распознать тикеры.")
+            return ConversationHandler.END
+
+        await update.message.reply_text(f"🔎 Обрабатываю {len(tickers)} тикеров за {days} дней...")
+        
+        for ticker in tickers:
+            await calculate_single_delta(update, context, ticker, days)
+            await asyncio.sleep(0.5)  # Небольшая задержка, чтобы Telegram не заспамился
+        
         return ConversationHandler.END
+
     except ValueError:
         await update.message.reply_text("⚠️ Введите целое число, например: 10")
         return ASK_DELTA_DAYS
@@ -722,23 +756,24 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
             ema_label = "Нет сигнала"
 
         sma_icon = "🟢" if price_above_sma30 else "🔴"
+        flow_icon = "🟢" if ad_delta > 0 else "🔴"
         
         msg += "<pre>\n"
-        msg += f"{'Тикер':<6} {'Δ Цены':<9} {'Δ Потока':>11} {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
+        msg += f"{'Тикер':<6} {'Δ Цены':<9} {flow_icon}{'Δ Потока':>11} {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
         msg += f"{ticker:<6} {price_pct:5.1f}% {ad_delta/1_000_000:8,.0f} млн ₽ {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x {ema_icon:>5} {sma_icon:>4}\n"
-        msg += "</pre>\n\n"
+        msg += "</pre>\n"
         
         # Добавляем интерпретацию результатов
-        if ad_delta > 0:
-            msg += "Деньги приходят в акцию 🟢 \n"
-        else:
-            msg += "Деньги уходят из акции 🔴\n"
+        #if ad_delta > 0:
+        #    msg += "Деньги приходят в акцию 🟢 \n"
+        #else:
+        #    msg += "Деньги уходят из акции 🔴\n"
         
         msg += f"💰 Среднедневной оборот: {avg_turnover/1_000_000:.1f} млн ₽\n"
 
         # Добавляем расшифровку сигналов
-        msg += f"EMA20x50: {ema_icon} ({ema_label})\n"
-        msg += f"SMA30 Weekly: {sma_icon} ({'Цена выше SMA30 1W' if price_above_sma30 else 'Цена ниже SMA30 1W'})"
+        #msg += f"EMA20x50: {ema_icon} ({ema_label})\n"
+        #msg += f"SMA30 Weekly: {sma_icon} ({'Цена выше SMA30 1W' if price_above_sma30 else 'Цена ниже SMA30 1W'})"
         
         await update.message.reply_text(msg, parse_mode="HTML")
         
