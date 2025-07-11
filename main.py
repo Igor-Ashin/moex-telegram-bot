@@ -69,6 +69,21 @@ SECTORS = {
     "Машиностроение": ["UWGN", "SVAV", "KMAZ", "UNAC", "IRKT"]
 }
 
+SECTORS1 = {
+    "Финансы": ["SBER", "T", "VTBR", "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS"],
+    "Нефтегаз": ["GAZP", "NVTK", "LKOH", "ROSN", "TATNP", "TATN", "SNGS", "SNGSP", "BANE", "BANEP", "RNFT"],
+    "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP", "MTLR", "PLZL", "SGZH"],
+    "IT": ["YDEX", "DATA", "HEAD", "POSI", "VKCO", "ASTR", "DELI", "WUSH", "CNRU", "DIAS"],
+    "Телеком": ["MTSS", "RTKMP", "RTKM"],
+    "Строители": [ "SMLT", "PIKK"],
+    "Ритейл": ["X5", "MGNT", "LENT", "BELU",  "OZON", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID"],
+    "Электро": ["IRAO", "UPRO", "LSNGP", "MRKP"],
+    "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
+    "Агро": ["PHOR", "RAGR"],
+    "Медицина": ["MDMG", "OZPH", "PRMD"],
+    "Машиностроение": ["UWGN", "SVAV"]
+}
+
 TICKERS_PER_PAGE = 10
 
 ASK_DAYS = 1  # состояние для выбора дней
@@ -312,7 +327,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         start_time = datetime.now()
         MAX_EXECUTION_TIME = 1500  # 25 минут
         
-        all_tickers = sum(SECTORS.values(), [])
+        all_tickers = sum(SECTORS1.values(), [])
         print(f"🔁 Всего тикеров для обработки: {len(all_tickers)}")
         
         long_hits, short_hits = [], []
