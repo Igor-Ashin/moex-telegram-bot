@@ -1710,21 +1710,21 @@ if Update and ContextTypes:
         
         await update.message.reply_text(result_text)
 
-    # === ИНТЕГРАЦИЯ КЭШИРОВАНИЯ ===
-try:
-    import caching
-    print("✅ Модуль кэширования загружен успешно")
+        # === ИНТЕГРАЦИЯ КЭШИРОВАНИЯ ===
+    try:
+        import caching
+        print("✅ Модуль кэширования загружен успешно")
+        
+        # Явная активация
+        if hasattr(caching, 'activate_caching_if_enabled'):
+            success = caching.activate_caching_if_enabled()
+            if success:
+                print("🎯 Кэширование активировано")
+            else:
+                print("⚠️ Кэширование не активировано")
     
-    # Явная активация
-    if hasattr(caching, 'activate_caching_if_enabled'):
-        success = caching.activate_caching_if_enabled()
-        if success:
-            print("🎯 Кэширование активировано")
-        else:
-            print("⚠️ Кэширование не активировано")
-
-except ImportError:
-    print("ℹ️ Модуль кэширования не найден, работаем без кэша")
+    except ImportError:
+        print("ℹ️ Модуль кэширования не найден, работаем без кэша")
 
 
     # Обработчики callback
