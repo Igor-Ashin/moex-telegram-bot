@@ -739,12 +739,12 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
             delta_pct = 0
 
         # Формируем сообщение
-        msg = f"📊 Анализ дельты денежного потока для {ticker}\n"
-        msg += f"📅 Период: {date_start} – {date_end} ({days} дней)\n\n"
+        msg = f"📊 *Анализ дельты денежного потока для {ticker}*\n"
+        msg += f"📅 *Период: {date_start} – {date_end} ({days} дней)*\n\n"
         
         # Добавляем предупреждение о низком обороте
         if filter_avg_turnover < 50_000_000:
-            msg += "⚠️ Внимание: низкий среднедневной оборот (< 50 млн ₽)\n\n"
+            msg += "⚠️ *Внимание: низкий среднедневной оборот (< 50 млн ₽)*\n\n"
 
         # Иконки для сигналов
         if ema20x50_long:
@@ -760,15 +760,13 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         sma_icon = "🟢" if price_above_sma30 else "🔴"
         flow_icon = "🟢" if ad_delta > 0 else "🔴"
         
-
-        msg += f"*Тикер:* {ticker}\n"
-        msg += f"*Δ Цены:* {price_pct:+.1f}%\n"
-        msg += f"{flow_icon} *Δ Потока:* {ad_delta/1_000_000:.0f} млн ₽\n"
-        msg += f"*Δ / Оборот:* {delta_pct:.1f}%\n"
-        msg += f"*Δ Цены 1D:* {price_change_day*100:+.1f}%\n"
-        msg += f"*Объём:* {ratio:.1f}x\n"
-        msg += f"*EMA20x50:* {ema_icon}\n"
-        msg += f"*SMA30:* {sma_icon}\n"
+        msg += f"*Δ Цены за период:* {price_pct:+.1f}%\n"
+        msg += f"*Δ Потока:* {ad_delta/1_000_000:+.0f} млн ₽ {flow_icon}   *Δ / Оборот:* {delta_pct:.1f}%\n"
+        #msg += f"*Δ / Оборот:* {delta_pct:.1f}%\n"
+        msg += f"*Δ Цены 1D:* {price_change_day*100:+.1f}%   *Объём:* {ratio:.1f}x\n"
+        #msg += f"*Объём:* {ratio:.1f}x\n"
+        msg += f"*EMA20x50:* {ema_icon}   *SMA30:* {sma_icon}\n"
+        #msg += f"*SMA30:* {sma_icon}\n"
         msg += "\n"
         
         # Добавляем интерпретацию результатов
