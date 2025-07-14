@@ -172,6 +172,11 @@ def get_cache_stats():
     """Возвращает статистику кэша"""
     import sys
     
+    print(f"🔍 Отладка кэша:")
+    print(f"   moex_cache: {len(moex_cache)} записей")
+    print(f"   weekly_cache: {len(weekly_cache)} записей") 
+    print(f"   figi_cache: {len(figi_cache)} записей")
+    
     moex_size = sys.getsizeof(moex_cache) / 1024 / 1024
     weekly_size = sys.getsizeof(weekly_cache) / 1024 / 1024
     figi_size = sys.getsizeof(figi_cache) / 1024 / 1024
@@ -185,23 +190,49 @@ def get_cache_stats():
         'size_mb': round(moex_size + weekly_size + figi_size, 2)
     }
 
+
 def enable_caching():
     """Включает кэширование, заменяя оригинальные функции"""
     try:
-        # Импортируем основной модуль
-        import main
+        import sys
         
-        # Заменяем функции
-        main.get_moex_data = get_moex_data_with_cache
-        main.get_moex_weekly_data = get_moex_weekly_data_with_cache
-        main.get_figi_by_ticker = get_figi_by_ticker_with_cache
-        
-        print("✅ Кэширование включено")
-        return True
+        # Проверяем, что модуль main уже загружен
+        if 'main' in sys.modules:
+            main_module = sys.modules['main']
+            
+            # Проверяем наличие функций и заменяем их
+            if hasattr(main_module, 'get_moex_data'):
+                print(f"🔄 Заменяем get_moex_data на кэшированную версию")
+                main_module._original_get_moex_data = main_module.get_moex_data
+                main_module.get_moex_data = get_moex_data_with_cache
+                
+            if hasattr(main_module, 'get_moex_weekly_data'):
+                print(f"🔄 Заменяем get_moex_weekly_data на кэшированную версию")
+                main_module._original_get_moex_weekly_data = main_module.get_moex_weekly_data
+                main_module.get_moex_weekly_data = get_moex_weekly_data_with_cache
+                
+            if hasattr(main_module, 'get_figi_by_ticker'):
+                print(f"🔄 Заменяем get_figi_by_ticker на кэшированную версию")
+                main_module._original_get_figi_by_ticker = main_module.get_figi_by_ticker
+                main_module.get_figi_by_ticker = get_figi_by_ticker_with_cache
+            
+            print("✅ Кэширование включено успешно")
+            return True
+        else:
+            print("⚠️ Модуль main еще не загружен")
+            return False
+            
     except Exception as e:
         print(f"❌ Ошибка включения кэширования: {e}")
         return False
 
-# Автоматическое включение при импорте
-if ENABLE_CACHING:
-    enable_caching()
+# Убираем автоматическое включение при импорте
+# if ENABLE_CACHING:
+#     enable_caching()
+
+# Добавляем функцию для отложенной активации
+def activate_caching_if_enabled():
+    """Активирует кэширование если включено в настройках"""
+    if ENABLE_CACHING:
+        return enable_caching()
+    return False
