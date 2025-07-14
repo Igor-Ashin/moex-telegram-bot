@@ -256,15 +256,7 @@ def compute_rsi(series, window=14):
     rsi = rsi.replace([np.inf, -np.inf], np.nan)
     return rsi.round(0)
 
-def calculate_money_ad(df):
-    """Расчет Money A/D индикатора"""
-    df = df.copy()
-    df['TYP'] = (df['high'] + df['low'] + df['close']) / 3
-    df['CLV'] = ((df['close'] - df['low']) - (df['high'] - df['close'])) / (df['high'] - df['low'])
-    df['CLV'] = df['CLV'].fillna(0)
-    df['money_flow'] = df['CLV'] * df['volume'] * df['TYP']
-    df['money_ad'] = df['money_flow'].cumsum()
-    return df
+
 
 def analyze_indicators(df):
     """Анализ технических индикаторов"""
@@ -841,8 +833,861 @@ if Update and ContextTypes:
         
         await update.message.reply_text(msg, parse_mode="HTML")
 
-    # Остальные команды (cross_ema20x50, cross_ema20x50_4h, long_moneyflow, rsi_top и т.д.)
-    # ... [здесь должны быть все остальные команды из оригинального файла]
+
+async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 14 дней...")
+    long_hits, short_hits = [], []
+    today = datetime.today().date()
+    
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            df = get_moex_data(ticker, days=100)  # достаточно для расчета EMA
+            if df.empty or len(df) < 100:
+                continue
+                
+            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+            
+            # Получаем данные за последние 15 дней для анализа
+            recent = df.tail(15)  # 14 дней + текущий
+            
+            # Текущие значения
+            current_close = df['close'].iloc[-1]
+            current_ema20 = df['EMA20'].iloc[-1]
+            current_ema50 = df['EMA50'].iloc[-1]
+            
+            # Проверяем пересечения за последние 14 дней
+            for i in range(1, len(recent)):
+                prev_ema20 = recent['EMA20'].iloc[i-1]
+                prev_ema50 = recent['EMA50'].iloc[i-1]
+                curr_ema20 = recent['EMA20'].iloc[i]
+                curr_ema50 = recent['EMA50'].iloc[i]
+                curr_close = recent['close'].iloc[i]  # Цена в день пересечения
+                
+                # Получаем дату для текущего дня
+                date = recent.index[i].strftime('%d.%m.%Y')
+                
+                # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
+                if (
+                    prev_ema20 <= prev_ema50
+                    and curr_ema20 > curr_ema50
+                    and curr_close > curr_ema20
+                    and current_close > current_ema20
+                    and current_ema20 > current_ema50
+                ):
+                    long_hits.append((ticker, date))
+                    break  # Только одно пересечение за период
+        
+                # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
+                elif (
+                    prev_ema20 >= prev_ema50
+                    and curr_ema20 < curr_ema50
+                    and curr_close < curr_ema20
+                    and current_close < current_ema20
+                    and current_ema20 < current_ema50
+                ):
+                    short_hits.append((ticker, date))
+                    break  # Только одно пересечение за период
+                    
+        except Exception as e:
+            print(f"Ошибка EMA для {ticker}: {e}")
+            continue
+    
+    # Сортировка по дате (новые вверх)
+    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+    short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+    
+    # Формируем сообщение
+    msg = ""
+    if long_hits:
+        msg += f"🟢 *Лонг пересечение EMA20×50 за последние 14 дней, всего: {len(long_hits)}:*\n"
+        msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
+    else:
+        msg += "🟢 *Лонг сигналов не найдено за последние 14 дней*\n\n"
+        
+    if short_hits:
+        msg += f"🔴 *Шорт пересечение EMA20×50 за последние 14 дней, всего: {len(short_hits)}:*\n"
+        msg += "\n".join(f"{t} {d}" for t, d in short_hits)
+    else:
+        msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*\n\n"
+    msg += "\n"   
+    # Добавляем итоговый список тикеров внизу
+    if long_hits or short_hits:
+        tickers_summary = []
+        if long_hits:
+            long_tickers = ", ".join(t for t, _ in long_hits)
+            tickers_summary.append(f"*Лонг:* {long_tickers}")
+        if short_hits:
+            short_tickers = ", ".join(t for t, _ in short_hits)
+            tickers_summary.append(f"*Шорт:* {short_tickers}")
+        msg += "\n" + "\n".join(tickers_summary)
+
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 25 свечей...")
+        print("▶ Запущена команда EMA CROSS")
+        
+        # Контроль времени выполнения
+        start_time = datetime.now()
+        MAX_EXECUTION_TIME = 1500  # 25 минут
+        
+        all_tickers = sum(SECTORS1.values(), [])
+        print(f"🔁 Всего тикеров для обработки: {len(all_tickers)}")
+        
+        long_hits, short_hits = [], []
+        processed_count = 0
+        
+        # Обрабатываем тикеры с ограничением по времени
+        for ticker in all_tickers:
+            # Проверка времени выполнения
+            if (datetime.now() - start_time).seconds > MAX_EXECUTION_TIME:
+                print(f"⏰ Превышено максимальное время выполнения ({MAX_EXECUTION_TIME} сек)")
+                break
+                
+            try:
+                print(f"🔁 Обрабатываем {ticker} ({processed_count + 1}/{len(all_tickers)})")
+                
+                # Принудительно сбрасываем буфер логов
+                import sys
+                sys.stdout.flush()
+                
+                # Добавляем timeout для каждого тикера
+                print(f"📡 Запрашиваем данные для {ticker}...")
+                
+                # Оборачиваем ВСЮ обработку тикера в timeout
+                ticker_result = await asyncio.wait_for(
+                    process_single_ticker(ticker),
+                    timeout=20.0  # 20 секунд на весь тикер
+                )
+                
+                if ticker_result:
+                    long_signal, short_signal = ticker_result
+                    if long_signal:
+                        long_hits.append(long_signal)
+                        print(f"✅ Лонг сигнал: {long_signal[0]} на {long_signal[1]}")
+                    if short_signal:
+                        short_hits.append(short_signal)
+                        print(f"✅ Шорт сигнал: {short_signal[0]} на {short_signal[1]}")
+                
+                print(f"✅ Завершен анализ для {ticker}")
+                processed_count += 1
+                
+                # Отправляем промежуточное уведомление каждые 20 тикеров
+                if processed_count % 20 == 0:
+                    try:
+                        progress_msg = f"⏳ Обработано {processed_count}/{len(all_tickers)} тикеров..."
+                        await update.message.reply_text(progress_msg)
+                        print(f"📱 Отправлено уведомление: {progress_msg}")
+                    except Exception as progress_e:
+                        print(f"❌ Ошибка отправки прогресса: {progress_e}")
+                
+                # Небольшая задержка между запросами + принудительный сброс буфера
+                await asyncio.sleep(0.5)  # Увеличиваем задержку для API Tinkoff
+                sys.stdout.flush()
+                
+            except asyncio.TimeoutError:
+                print(f"⏰ Таймаут для {ticker}")
+                sys.stdout.flush()
+                continue
+            except Exception as e:
+                print(f"❌ Ошибка EMA для {ticker}: {e}")
+                sys.stdout.flush()
+                continue
+        
+        print(f"✅ Обработано тикеров: {processed_count}/{len(all_tickers)}")
+        
+        # Сортировка по дате (новые вверх)
+        try:
+            long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
+            short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
+        except Exception as e:
+            print(f"❌ Ошибка сортировки: {e}")
+        
+        # Ограничиваем количество результатов
+        long_hits = long_hits[:30]
+        short_hits = short_hits[:30]
+        
+        # Формируем сообщение
+        execution_time = (datetime.now() - start_time).seconds
+        msg = f"📊 *Анализ завершен* (обработано {processed_count} тикеров за {execution_time} сек)\n\n"
+        
+        if long_hits:
+            msg += f"🟢 *Лонг пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(long_hits)}:*\n"
+            msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
+        else:
+            msg += "🟢 *Лонг сигналов не найдено за последние 25 4Ч свечей*\n\n"
+            
+        if short_hits:
+            msg += f"🔴 *Шорт пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(short_hits)}:*\n\n"
+            msg += "\n".join(f"{t} {d}" for t, d in short_hits)
+        else:
+            msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*\n\n"
+        msg += "\n"
+        # Добавляем итоговый список тикеров внизу
+        if long_hits or short_hits:
+            tickers_summary = []
+            if long_hits:
+                long_tickers = ", ".join(t for t, _ in long_hits)
+                tickers_summary.append(f"*Лонг:* {long_tickers}")
+            if short_hits:
+                short_tickers = ", ".join(t for t, _ in short_hits)
+                tickers_summary.append(f"*Шорт:* {short_tickers}")
+            msg += "\n" + "\n".join(tickers_summary)
+        
+        # Отправляем результат
+        await update.message.reply_text(msg, parse_mode="Markdown")
+        print("✅ Команда EMA CROSS завершена успешно")
+        
+    except Exception as main_e:
+        print(f"❌ Критическая ошибка в команде EMA CROSS: {main_e}")
+        try:
+            await update.message.reply_text(
+                "❌ Произошла ошибка при анализе пересечений EMA. Попробуйте позже.",
+                parse_mode="Markdown"
+            )
+        except:
+            print("❌ Не удалось отправить сообщение об ошибке")
+
+
+async def process_single_ticker(ticker: str):
+    """
+    Обрабатывает один тикер и возвращает найденные сигналы
+    """
+    try:
+        # Получаем данные
+        df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25)
+        print(f"📊 Данные получены для {ticker}: {len(df) if not df.empty else 0} свечей")
+        
+        if df.empty:
+            print(f"❌ Пустые данные для {ticker}")
+            return None
+            
+        # Проверяем минимальное количество данных
+        if len(df) < 50:
+            print(f"❌ Недостаточно данных для {ticker}: {len(df)} свечей")
+            return None
+        
+        print(f"🧮 Рассчитываем EMA для {ticker}...")
+        # Рассчитываем EMA в отдельном потоке для избежания блокировки
+        def calculate_ema(df):
+            df_copy = df.copy()
+            df_copy['EMA20'] = df_copy['close'].ewm(span=20, adjust=False).mean()
+            df_copy['EMA50'] = df_copy['close'].ewm(span=50, adjust=False).mean()
+            return df_copy
+        
+        df = await asyncio.to_thread(calculate_ema, df)
+        
+        print(f"🔍 Анализируем пересечения для {ticker}...")
+        # Получаем данные за последние 26 свечей для анализа
+        recent = df.tail(26)
+        
+        # Текущие значения
+        current_close = df['close'].iloc[-1]
+        current_ema20 = df['EMA20'].iloc[-1]
+        current_ema50 = df['EMA50'].iloc[-1]
+        
+        long_signal = None
+        short_signal = None
+        
+        # Проверяем пересечения за последний период
+        for i in range(1, len(recent)):
+            try:
+                prev_ema20 = recent['EMA20'].iloc[i-1]
+                prev_ema50 = recent['EMA50'].iloc[i-1]
+                curr_ema20 = recent['EMA20'].iloc[i]
+                curr_ema50 = recent['EMA50'].iloc[i]
+                curr_close = recent['close'].iloc[i]
+                
+                # Получаем дату для текущего дня
+                date = recent.index[i].strftime('%d.%m.%Y %H:%M')
+                
+                # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
+                if (
+                    prev_ema20 <= prev_ema50
+                    and curr_ema20 > curr_ema50
+                    and curr_close > curr_ema20
+                    and current_close > current_ema20
+                    and current_ema20 > current_ema50
+                ):
+                    long_signal = (ticker, date)
+                    break
+        
+                # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
+                elif (
+                    prev_ema20 >= prev_ema50
+                    and curr_ema20 < curr_ema50
+                    and curr_close < curr_ema20
+                    and current_close < current_ema20
+                    and current_ema20 < current_ema50
+                ):
+                    short_signal = (ticker, date)
+                    break
+            except Exception as inner_e:
+                print(f"❌ Ошибка при анализе пересечений для {ticker}: {inner_e}")
+                continue
+        
+        return (long_signal, short_signal)
+        
+    except Exception as e:
+        print(f"❌ Ошибка обработки тикера {ticker}: {e}")
+        return None
+
+
+
+async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Получает количество дней и выполняет расчет дельты"""
+    try:
+        days = int(update.message.text)
+        if not (1 <= days <= 100):
+            await update.message.reply_text("⚠️ Введите число от 1 до 100.")
+            return ASK_DELTA_DAYS
+
+        ticker_input = context.user_data['delta_ticker']  # Тут может быть строка типа: BSPB, RTKM, POSI
+        tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
+
+        if not tickers:
+            await update.message.reply_text("⚠️ Не удалось распознать тикеры.")
+            return ConversationHandler.END
+
+        await update.message.reply_text(f"🔎 Обрабатываю {len(tickers)} тикеров за {days} дней...")
+        
+        for ticker in tickers:
+            await calculate_single_delta(update, context, ticker, days)
+            await asyncio.sleep(0.5)  # Небольшая задержка, чтобы Telegram не заспамился
+        
+        return ConversationHandler.END
+
+    except ValueError:
+        await update.message.reply_text("⚠️ Введите целое число, например: 10")
+        return ASK_DELTA_DAYS
+
+
+async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_TYPE, ticker: str, days: int):
+    """Рассчитывает дельту денежного потока для одной акции"""
+    await update.message.reply_text(f"🔍 Рассчитываю дельту денежного потока для {ticker} за {days} дней...")
+    
+    try:
+        df = get_moex_data(ticker, days=100)  # с запасом
+        if df.empty or len(df) < days + 1:
+            await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте увеличить количество дней.")
+            return
+
+        
+        df = df.rename(columns={'close': 'close', 'volume': 'volume'})
+        df = calculate_money_ad(df)
+
+        ad_start = df['money_ad'].iloc[-(days+1)]
+        ad_end = df['money_ad'].iloc[-1]
+        ad_delta = ad_end - ad_start
+
+        price_start = df['close'].iloc[-(days+1)]
+        price_end = df['close'].iloc[-1]
+        date_start = df.index[-(days+1)].strftime('%d.%m.%y')
+        date_end = df.index[-1].strftime('%d.%m.%y')
+        
+        price_delta = price_end - price_start
+        price_pct = 100 * price_delta / price_start
+
+        # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
+        filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
+        filter_avg_turnover = filter_turnover_series.mean()
+        
+        # 💰 Среднедневной денежный оборот за период
+        turnover_series = df['volume'].iloc[-days:] * df['close'].iloc[-days:]
+        avg_turnover = turnover_series.mean()
+
+
+        # Сегодняшний оборот
+        today_volume = df['volume'].iloc[-1]
+        today_close = df['close'].iloc[-1]
+        today_turnover = today_volume * today_close
+        
+        # Коэффициент превышения объёма
+        ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
+
+        # EMA20/EMA50 Daily
+        df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+        df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+        
+        current_ema20 = df['EMA20'].iloc[-1]
+        current_ema50 = df['EMA50'].iloc[-1]
+        current_price = df['close'].iloc[-1]
+        
+        # Условие для лонг сигнала EMA20x50
+        ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
+
+        # Условие для шорт сигнала EMA20x50
+        ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
+
+        # Изменение цены за день
+        price_change_day = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
+
+        # SMA30 Weekly
+        try:
+            wdf = get_moex_weekly_data(ticker, weeks=80)  # Больше недель для SMA30
+            if len(wdf) >= 30:
+                wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
+                weekly_sma30 = wdf['SMA30'].iloc[-1]
+                weekly_price = wdf['close'].iloc[-1]
+                price_above_sma30 = weekly_price > weekly_sma30 if pd.notna(weekly_sma30) else False
+            else:
+                price_above_sma30 = False
+        except:
+            price_above_sma30 = False
+        
+        # 📊 Отношение дельты потока к обороту (%)
+        if avg_turnover != 0:
+            delta_pct = 100 * ad_delta / avg_turnover
+        else:
+            delta_pct = 0
+
+        # Формируем сообщение
+        msg = f"📊 *Анализ дельты денежного потока для {ticker}*\n"
+        msg += f"📅 *Период: {date_start} – {date_end} ({days} дней)*\n\n"
+        
+        # Добавляем предупреждение о низком обороте
+        if filter_avg_turnover < 50_000_000:
+            msg += "⚠️ *Внимание: низкий среднедневной оборот (< 50 млн ₽)*\n\n"
+
+        # Иконки для сигналов
+        if ema20x50_long:
+            ema_icon = "🟢"
+            ema_label = "Лонг"
+        elif ema20x50_short:
+            ema_icon = "🔴"
+            ema_label = "Шорт"
+        else:
+            ema_icon = "⚫"
+            ema_label = "Нет сигнала"
+
+        sma_icon = "🟢" if price_above_sma30 else "🔴"
+        flow_icon = "🟢" if ad_delta > 0 else "🔴"
+        
+        msg += f"*Δ Цены за период:* {price_pct:+.1f}%\n"
+        msg += f"*Δ Потока:* {ad_delta/1_000_000:+.0f} млн ₽ {flow_icon}   *Δ / Оборот:* {delta_pct:.1f}%\n"
+        #msg += f"*Δ / Оборот:* {delta_pct:.1f}%\n"
+        msg += f"*Δ Цены 1D:* {price_change_day*100:+.1f}%   *Объём:* {ratio:.1f}x\n"
+        #msg += f"*Объём:* {ratio:.1f}x\n"
+        msg += f"*EMA20x50:* {ema_icon}   *SMA30:* {sma_icon}\n"
+        #msg += f"*SMA30:* {sma_icon}\n"
+        msg += "\n"
+        
+        # Добавляем интерпретацию результатов
+        #if ad_delta > 0:
+        #    msg += "Деньги приходят в акцию 🟢 \n"
+        #else:
+        #    msg += "Деньги уходят из акции 🔴\n"
+        
+        msg += f"💰 *Среднедневной оборот:* {avg_turnover/1_000_000:.1f} млн ₽\n"
+
+        # Добавляем расшифровку сигналов
+        #msg += f"EMA20x50: {ema_icon} ({ema_label})\n"
+        #msg += f"SMA30 Weekly: {sma_icon} ({'Цена выше SMA30 1W' if price_above_sma30 else 'Цена ниже SMA30 1W'})"
+        
+        await update.message.reply_text(msg, parse_mode="Markdown")
+        
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при расчете дельты для {ticker}: {str(e)}")
+
+# RSI TOP
+async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Команда для показа топ 10 перекупленных и топ 10 перепроданных акций по RSI
+    """
+    await update.message.reply_text("🔍 Анализирую RSI всех акций. Это может занять некоторое время...")
+    
+    overbought_stocks = []  # RSI > 70
+    oversold_stocks = []    # RSI < 30
+    
+    # Проходим по всем тикерам
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            # Получаем данные за последние 100 дней (с запасом для RSI)
+            df = get_moex_data(ticker, days=100)
+            if df.empty or len(df) < 15:  # Минимум 15 дней для корректного RSI
+                continue
+            
+            # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
+            filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
+            filter_avg_turnover = filter_turnover_series.mean()
+            
+            # ❌ Фильтр по минимальному обороту: 50 млн руб за последние 10 дней
+            if filter_avg_turnover < 50_000_000:
+                continue
+            
+            # Вычисляем RSI
+            rsi = compute_rsi(df['close'], window=14)
+            if rsi.empty:
+                continue
+                
+            # Берем последнее значение RSI
+            current_rsi = rsi.iloc[-1]
+            if pd.isna(current_rsi):
+                continue
+                
+            # Текущая цена и изменение за день
+            current_price = df['close'].iloc[-1]
+            prev_price = df['close'].iloc[-2] if len(df) >= 2 else current_price
+            price_change = current_price - prev_price
+            price_change_pct = (price_change / prev_price * 100) if prev_price != 0 else 0
+            
+            # Относительный объем (текущий объем к среднему за 10 дней)
+            current_volume = df['volume'].iloc[-1]
+            avg_volume = df['volume'].iloc[-10:].mean()
+            relative_volume_pct = (current_volume / avg_volume * 100) if avg_volume != 0 else 100
+            
+            # Классификация по RSI
+            if current_rsi >= 70:
+                overbought_stocks.append((ticker, current_rsi, current_price, price_change_pct, relative_volume_pct))
+            elif current_rsi <= 30:
+                oversold_stocks.append((ticker, current_rsi, current_price, price_change_pct, relative_volume_pct))
+                
+        except Exception as e:
+            logger.error(f"Ошибка при анализе RSI для {ticker}: {e}")
+            continue
+    
+    # Сортируем списки
+    overbought_stocks.sort(key=lambda x: x[1], reverse=True)  # По убыванию RSI
+    oversold_stocks.sort(key=lambda x: x[1])                 # По возрастанию RSI
+    
+    # Формируем сообщение
+    msg = f"📊 RSI анализ на {datetime.now().strftime('%d.%m.%Y %H:%M')}:\n\n"
+    
+    # 🔴 Перекупленные акции (RSI >= 70)
+    if overbought_stocks:
+        msg += "🔴 Топ 10 перекупленных акций (RSI ≥ 70):\n"
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Изм %':<7}  {'Отн.об %':<8}\n"
+        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 7}  {'─' * 8}\n"
+        
+        for ticker, rsi_val, price, price_change_pct, rel_volume in overbought_stocks[:10]:
+            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {price_change_pct:+6.1f}%  {rel_volume:7.0f}%\n"
+        msg += "</pre>\n\n"
+    else:
+        msg += "🔴 Перекупленных акций (RSI ≥ 70) не найдено\n\n"
+    
+    # 🟢 Перепроданные акции (RSI <= 30)
+    if oversold_stocks:
+        msg += "🟢 Топ 10 перепроданных акций (RSI ≤ 30):\n"
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Изм %':<7}  {'Отн.об %':<8}\n"
+        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 7}  {'─' * 8}\n"
+        
+        for ticker, rsi_val, price, price_change_pct, rel_volume in oversold_stocks[:10]:
+            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {price_change_pct:+6.1f}%  {rel_volume:7.0f}%\n"
+        msg += "</pre>\n\n"
+    else:
+        msg += "🟢 Перепроданных акций (RSI ≤ 30) не найдено\n\n"
+    
+    # Статистика
+    total_analyzed = len(overbought_stocks) + len(oversold_stocks)
+    msg += f"📈 Статистика:\n"
+    msg += f"• Всего акций в зонах экстремума: {total_analyzed}\n"
+    msg += f"• Перекупленных: {len(overbought_stocks)}\n"
+    msg += f"• Перепроданных: {len(oversold_stocks)}\n"
+    msg += f"• Фильтр по обороту: ≥50 млн ₽/день"
+    
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
+
+# === Новая команда: long_moneyflow ===
+def calculate_money_ad(df):
+    df = df.copy()
+    df['TYP'] = (df['high'] + df['low'] + df['close']) / 3
+    df['CLV'] = ((df['close'] - df['low']) - (df['high'] - df['close'])) / (df['high'] - df['low'])
+    df['CLV'] = df['CLV'].fillna(0)
+    df['money_flow'] = df['CLV'] * df['volume'] * df['TYP']
+    df['money_ad'] = df['money_flow'].cumsum()
+    return df
+
+async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    days = context.user_data.get("days", 10)  # по умолчанию 10
+    await update.message.reply_text(f"🔍 Ищу Топ по притоку и оттоку денежного потока за {days} дней...")
+    
+    result = []
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            df = get_moex_data(ticker, days=100)  # с запасом
+            if df.empty or len(df) < days + 1:
+                continue
+
+            df = df.rename(columns={'close': 'close', 'volume': 'volume'})  # если еще не переименовано
+            df = calculate_money_ad(df)
+
+            ad_start = df['money_ad'].iloc[-(days+1)]
+            ad_end = df['money_ad'].iloc[-1]
+            ad_delta = ad_end - ad_start
+
+            price_start = df['close'].iloc[-(days+1)]
+            price_end = df['close'].iloc[-1]
+            date_start = df.index[-(days+1)].strftime('%d.%m.%y')
+            date_end = df.index[-1].strftime('%d.%m.%y')
+            
+            price_delta = price_end - price_start
+            price_pct = 100 * price_delta / price_start
+
+            # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
+            filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
+            filter_avg_turnover = filter_turnover_series.mean()
+            
+            # ❌ Фильтр по минимальному обороту: 50 млн руб за последние 10 дней
+            if filter_avg_turnover < 50_000_000:
+                continue
+                
+            # 💰 Среднедневной денежный оборот за период
+            turnover_series = df['volume'].iloc[-days:] * df['close'].iloc[-days:]
+            avg_turnover = turnover_series.mean()
+            
+            # Сегодняшний оборот
+            today_volume = df['volume'].iloc[-1]
+            today_close = df['close'].iloc[-1]
+            today_turnover = today_volume * today_close
+            
+            # Коэффициент превышения объёма
+            ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
+
+            # EMA20/EMA50 Daily
+            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+            
+            current_ema20 = df['EMA20'].iloc[-1]
+            current_ema50 = df['EMA50'].iloc[-1]
+            current_price = df['close'].iloc[-1]
+            
+            # Условие для лонг сигнала EMA20x50
+            ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
+            # Условие для лонг сигнала EMA20x50
+            ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
+
+            # Изменение цены за день
+            price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
+
+            # SMA30 Weekly
+            try:
+                wdf = get_moex_weekly_data(ticker, weeks=80)  # Больше недель для SMA30
+                if len(wdf) >= 30:
+                    wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
+                    weekly_sma30 = wdf['SMA30'].iloc[-1]
+                    weekly_price = wdf['close'].iloc[-1]
+                    price_above_sma30 = weekly_price > weekly_sma30 if pd.notna(weekly_sma30) else False
+                else:
+                    price_above_sma30 = False
+            except:
+                price_above_sma30 = False
+            
+            # 📊 Отношение дельты потока к обороту (%)
+            if avg_turnover != 0:
+                delta_vs_turnover = 100 * ad_delta / avg_turnover
+            else:
+                delta_vs_turnover = 0
+            
+            # 🪵 Лог для отладки
+            print(f"{ticker} — Δ: {ad_delta:.2f}, Price %: {price_pct:.2f}, AvgTurn: {avg_turnover:.2f}, Δ% от оборота: {delta_vs_turnover:.2f}%")
+            
+            # Добавим в итог
+            if ad_delta != 0:
+                result.append((
+                    ticker,
+                    round(price_pct, 2),
+                    round(ad_delta, 2),
+                    date_start,
+                    date_end,
+                    round(delta_vs_turnover, 2),
+                    price_change, 
+                    ratio, 
+                    ema20x50_long, 
+                    ema20x50_short,
+                    price_above_sma30,
+            ))
+        except Exception as e:
+            print(f"Ошибка Money A/D для {ticker}: {e}")
+            continue
+
+    if not result:
+        await update.message.reply_text("Не найдено активов с ростом или падением денежного потока (Money A/D)")
+        return
+
+    # Разделим на положительные и отрицательные дельты
+    result_up = [r for r in result if r[2] > 0]
+    result_down = [r for r in result if r[2] < 0]
+
+    result_up.sort(key=lambda x: x[5], reverse=True)     # по убыванию
+    result_down.sort(key=lambda x: x[5])                 # по возрастанию
+
+    period = f"{result[0][3]}–{result[0][4]}"
+
+    msg = f"🏦 Топ по денежному потоку за период {date_start}–{date_end}:\n\n"
+
+    # 📈 Рост
+    if result_up:
+        msg += "📈 Топ 10 по притоку:\n"
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
+        # Убираем линию с дефисами, как просил
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema20x50_long, ema20x50_short, sma_signal in result_up[:10]:
+            if ema20x50_long:
+                ema_icon = "🟢"
+            elif ema20x50_short:
+                ema_icon = "🔴"
+            else:
+                ema_icon = "⚫"
+            sma_icon = "🟢" if sma_signal else "🔴"
+            msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
+        msg += "</pre>\n\n"
+    
+    # 📉 Падение
+    if result_down:
+        msg += "📉 Топ 10 по оттоку:\n"
+        msg += "<pre>\n"
+        msg += f"{'Тикер':<6}  {'Δ Цены':<9}  {'Δ Потока':>11}  {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
+        # Линию тоже убираем
+        for ticker, price_pct, ad_delta, _, _, delta_pct, price_change_day, ratio, ema20x50_long, ema20x50_short, sma_signal in result_down[:10]:
+            if ema20x50_long:
+                ema_icon = "🟢"
+            elif ema20x50_short:
+                ema_icon = "🔴"
+            else:
+                ema_icon = "⚫"
+            sma_icon = "🟢" if sma_signal else "🔴"
+            msg += f"{ticker:<6}  {price_pct:5.1f}%  {ad_delta/1_000_000:8,.0f} млн ₽  {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x  {ema_icon:>5} {sma_icon:>4}\n"
+        msg += "</pre>\n"
+    
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
+# Получение данных для Штейн
+def get_moex_weekly_data(ticker="SBER", weeks=80):
+    try:
+        till = datetime.today().strftime('%Y-%m-%d')
+        from_date = (datetime.today() - pd.Timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
+        url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=7&from={from_date}&till={till}"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        candles = data['candles']['data']
+        columns = data['candles']['columns']
+        df = pd.DataFrame(candles, columns=columns)
+        df['begin'] = pd.to_datetime(df['begin'])
+        df = df.sort_values('begin')
+        df.set_index('begin', inplace=True)
+        df = df.rename(columns={'close': 'close'})
+        df = df[['close']].dropna()
+        return df.tail(weeks)
+    except Exception as e:
+        print(f"Ошибка получения данных для {ticker}: {e}")
+        return pd.DataFrame()
+
+
+# Telegram команды
+if Update and ContextTypes:
+
+    async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
+        
+        crossovers = []
+        all_tickers = sum(SECTORS.values(), [])
+        
+        # Проверяем каждый тикер
+        for ticker in all_tickers:
+            try:
+                crossover_date = find_sma30_crossover(ticker, days=7)
+                if crossover_date:
+                    crossovers.append((ticker, crossover_date))
+            except Exception as e:
+                print(f"Ошибка при анализе {ticker}: {e}")
+                continue
+        
+        if not crossovers:
+            await update.message.reply_text("📊 За последние 7 дней не найдено акций с пересечением цены через SMA30 снизу вверх.")
+            return
+        
+        # Сортируем по дате (от самого свежего к самому старому)
+        crossovers.sort(key=lambda x: x[1], reverse=True)
+        
+        # Формируем результат
+        result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 7 дней:\n\n"
+        
+        for ticker, date in crossovers:
+            formatted_date = date.strftime('%d.%m.%Y')
+            result_text += f"{ticker} {formatted_date}\n"
+        
+        result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
+        
+        await update.message.reply_text(result_text)
+
+
+    async def stan_recent_d_short(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
+        
+        crossovers = []
+        all_tickers = sum(SECTORS.values(), [])
+        
+        # Проверяем каждый тикер
+        for ticker in all_tickers:
+            try:
+                crossover_date = find_sma30_crossover_short(ticker, days=7)
+                if crossover_date:
+                    crossovers.append((ticker, crossover_date))
+            except Exception as e:
+                print(f"Ошибка при анализе {ticker}: {e}")
+                continue
+        
+        if not crossovers:
+            await update.message.reply_text("📊 За последние 7 дней не найдено акций с пересечением цены через SMA30 сверху вниз.")
+            return
+        
+        # Сортируем по дате (от самого свежего к самому старому)
+        crossovers.sort(key=lambda x: x[1], reverse=True)
+        
+        # Формируем результат
+        result_text = "📈 Акции с Short пересечением цены через SMA30 сверху вниз за последние 7 дней:\n\n"
+        
+        for ticker, date in crossovers:
+            formatted_date = date.strftime('%d.%m.%Y')
+            result_text += f"{ticker} {formatted_date}\n"
+        
+        result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
+        
+        await update.message.reply_text(result_text)
+    
+    async def stan_recent_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
+        
+        crossovers = []
+        all_tickers = sum(SECTORS.values(), [])
+        
+        # Проверяем каждый тикер
+        for ticker in all_tickers:
+            try:
+                crossover_date = find_sma30_crossover_week(ticker, weeks=5)
+                if crossover_date:
+                    crossovers.append((ticker, crossover_date))
+            except Exception as e:
+                print(f"Ошибка при анализе {ticker}: {e}")
+                continue
+        
+        if not crossovers:
+            await update.message.reply_text("📊 За последние 5 недель не найдено акций с пересечением цены через SMA30 снизу вверх.")
+            return
+        
+        # Сортируем по дате (от самого свежего к самому старому)
+        crossovers.sort(key=lambda x: x[1], reverse=True)
+        
+        # Формируем результат
+        result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 5 недель:\n\n"
+        
+        for ticker, date in crossovers:
+            formatted_date = date.strftime('%d.%m.%Y')
+            result_text += f"{ticker} {formatted_date}\n"
+        
+        result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
+        
+        await update.message.reply_text(result_text)
+    
 
     # Обработчики callback
     async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
