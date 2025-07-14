@@ -1800,6 +1800,10 @@ if Update and ContextTypes:
 # === ЗАПУСК БОТА ===
 
 if __name__ == '__main__':
+
+    import caching
+    caching.enable_caching()
+    
     TOKEN = os.getenv("TELEGRAM_TOKEN")
     if not TOKEN:
         print("❌ Переменная окружения TELEGRAM_TOKEN не установлена.")
