@@ -1621,7 +1621,7 @@ if Update and ContextTypes:
 
 
     async def stan_recent_d_short(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
+        await update.message.reply_text("🔍 Ищу акции с недавним short пересечением цены через SMA30...")
         
         crossovers = []
         all_tickers = sum(SECTORS.values(), [])
