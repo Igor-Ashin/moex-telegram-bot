@@ -97,6 +97,33 @@ ASK_DAYS = 1
 ASK_TICKER = 2
 ASK_DELTA_DAYS = 3
 
+
+async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отладочная команда для проверки кэша"""
+    try:
+        if 'caching' in globals():
+            stats = caching.get_cache_stats()
+            msg = f"🔍 **Отладка кэширования:**\n\n"
+            msg += f"📊 Статистика:\n"
+            msg += f"• MOEX кэш: {stats['moex_entries']} записей\n"
+            msg += f"• Weekly кэш: {stats['weekly_entries']} записей\n"
+            msg += f"• FIGI кэш: {stats['figi_entries']} записей\n"
+            msg += f"• Общий размер: {stats['size_mb']} MB\n\n"
+            
+            # Проверяем, заменены ли функции
+            import sys
+            if 'main' in sys.modules:
+                main_module = sys.modules['main']
+                msg += f"🔧 Замена функций:\n"
+                msg += f"• get_moex_data: {'✅' if hasattr(main_module, '_original_get_moex_data') else '❌'}\n"
+                msg += f"• get_moex_weekly_data: {'✅' if hasattr(main_module, '_original_get_moex_weekly_data') else '❌'}\n"
+                msg += f"• get_figi_by_ticker: {'✅' if hasattr(main_module, '_original_get_figi_by_ticker') else '❌'}\n"
+        else:
+            msg = "❌ Модуль caching не загружен"
+            
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка отладки: {e}")
 # === ФУНКЦИИ ПОЛУЧЕНИЯ ДАННЫХ ===
 
 def get_moex_data(ticker="SBER", days=120):
@@ -1778,6 +1805,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
     app.add_handler(CommandHandler("high_volume", high_volume))
     app.add_handler(CommandHandler("rsi_top", rsi_top))
+    app.add_handler(CommandHandler("cache_debug", cache_debug))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     # Хендлеры с диалогами
