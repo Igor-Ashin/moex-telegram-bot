@@ -1586,7 +1586,7 @@ def get_moex_weekly_data(ticker="SBER", weeks=80):
 if Update and ContextTypes:
 
     async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
+        await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30...")
         
         crossovers = []
         all_tickers = sum(SECTORS.values(), [])
@@ -1655,7 +1655,7 @@ if Update and ContextTypes:
         await update.message.reply_text(result_text)
     
     async def stan_recent_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с недавним пересечением цены через SMA30 снизу вверх...")
+        await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30...")
         
         crossovers = []
         all_tickers = sum(SECTORS.values(), [])
