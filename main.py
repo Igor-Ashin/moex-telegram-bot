@@ -760,10 +760,16 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         sma_icon = "🟢" if price_above_sma30 else "🔴"
         flow_icon = "🟢" if ad_delta > 0 else "🔴"
         
-        msg += "<pre>\n"
-        msg += f"{'Тикер':<6} {'Δ Цены':<9} {flow_icon}{'Δ Потока':>11} {'Δ / Оборот':>8} {'Δ Цены 1D':>8} {'Объём':>8} {'ema20х50':>7} {'sma30':>4}\n"
-        msg += f"{ticker:<6} {price_pct:5.1f}% {ad_delta/1_000_000:11,.0f} млн ₽ {delta_pct:8.1f}%  {price_change_day*100:>8.1f}%  {ratio:>6.1f}x {ema_icon:>5} {sma_icon:>4}\n"
-        msg += "</pre>\n"
+
+        msg += f"*Тикер:* {ticker}\n"
+        msg += f"*Δ Цены:* {price_pct:+.1f}%\n"
+        msg += f"{flow_icon} *Δ Потока:* {ad_delta/1_000_000:.0f} млн ₽\n"
+        msg += f"*Δ / Оборот:* {delta_pct:.1f}%\n"
+        msg += f"*Δ Цены 1D:* {price_change_day*100:+.1f}%\n"
+        msg += f"*Объём:* {ratio:.1f}x\n"
+        msg += f"*EMA20x50:* {ema_icon}\n"
+        msg += f"*SMA30:* {sma_icon}\n"
+        msg += "\n"
         
         # Добавляем интерпретацию результатов
         #if ad_delta > 0:
@@ -771,7 +777,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         #else:
         #    msg += "Деньги уходят из акции 🔴\n"
         
-        msg += f"💰 Среднедневной оборот: {avg_turnover/1_000_000:.1f} млн ₽\n"
+        msg += f"💰 *Среднедневной оборот:* {avg_turnover/1_000_000:.1f} млн ₽\n"
 
         # Добавляем расшифровку сигналов
         #msg += f"EMA20x50: {ema_icon} ({ema_label})\n"
