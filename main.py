@@ -560,7 +560,7 @@ if Update and ContextTypes:
             "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
             "/cross_ema20x50_4h — акции с пересечением EMA 20x50 на 4H\n"
             "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
-            "/stan_recent_short — акции с шорт пересечением SMA30 на 1D\n"
+            "/stan_recent_d_short — акции с шорт пересечением SMA30 на 1D\n"
             "/stan_recent_week — акции с лонг пересечением SMA30 на 1W\n"
             "/moneyflow - Топ по росту и оттоку денежного потока (Money A/D)\n"
             "/high_volume - Акции с повышенным объемом\n"
@@ -1766,11 +1766,18 @@ if __name__ == '__main__':
     # Создаём приложение
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Добавляем хендлеры
+    # === Добавляем хендлеры ===
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("chart_hv", chart_hv))
+    app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
+    app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
     app.add_handler(CommandHandler("stan", stan))
+    app.add_handler(CommandHandler("stan_recent", stan_recent))
+    app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
+    app.add_handler(CommandHandler("stan_recent_week", stan_recent_week))
+    app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
     app.add_handler(CommandHandler("high_volume", high_volume))
+    app.add_handler(CommandHandler("rsi_top", rsi_top))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     # Хендлеры с диалогами
