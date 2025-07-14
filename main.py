@@ -314,14 +314,14 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"🔴 *Шорт пересечение EMA20×50 за последние 14 дней, всего: {len(short_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in short_hits)
     else:
-        msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*\n"
-
+        msg += "🔴 *Шорт сигналов не найдено за последние 14 дней*\n\n"
+    msg += "\n"   
     # Добавляем итоговый список тикеров внизу
     if long_hits or short_hits:
         tickers_summary = []
         if long_hits:
             long_tickers = ", ".join(t for t, _ in long_hits)
-            tickers_summary.append(f"\n*Лонг:* {long_tickers}")
+            tickers_summary.append(f"*Лонг:* {long_tickers}")
         if short_hits:
             short_tickers = ", ".join(t for t, _ in short_hits)
             tickers_summary.append(f"*Шорт:* {short_tickers}")
@@ -430,7 +430,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += "\n".join(f"{t} {d}" for t, d in short_hits)
         else:
             msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*\n\n"
-
+        msg += "\n"
         # Добавляем итоговый список тикеров внизу
         if long_hits or short_hits:
             tickers_summary = []
