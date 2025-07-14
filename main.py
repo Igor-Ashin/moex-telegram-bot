@@ -658,14 +658,19 @@ async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("⚠️ Введите целое число, например: 10")
         return ASK_DELTA_DAYS
 
+def format_ticker_safe(ticker):
+    """Оборачивает тикер в обратные кавычки для безопасной отправки в Telegram"""
+    return f"`{ticker}`"
+
 async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_TYPE, ticker: str, days: int):
     """Рассчитывает дельту денежного потока для одной акции"""
-    await update.message.reply_text(f"🔍 Рассчитываю дельту денежного потока для {ticker} за {days} дней...")
+    safe_ticker = format_ticker_safe(ticker)
+    await update.message.reply_text(f"🔍 Рассчитываю дельту денежного потока для {safe_ticker} за {days} дней...")
     
     try:
         df = get_moex_data(ticker, days=100)  # с запасом
         if df.empty or len(df) < days + 1:
-            await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте увеличить количество дней.")
+            await update.message.reply_text(f"❌ Недостаточно данных для {safe_ticker}. Попробуйте увеличить количество дней.")
             return
 
         
@@ -738,7 +743,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
             delta_pct = 0
 
         # Формируем сообщение
-        msg = f"📊 Анализ дельты денежного потока для {ticker}\n"
+        msg = f"📊 Анализ дельты денежного потока для {safe_ticker}\n"
         msg += f"📅 Период: {date_start} – {date_end} ({days} дней)\n\n"
         
         # Добавляем предупреждение о низком обороте
@@ -779,7 +784,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(msg, parse_mode="HTML")
         
     except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка при расчете дельты для {ticker}: {str(e)}")
+        await update.message.reply_text(f"❌ Ошибка при расчете дельты для {safe_ticker}: {str(e)}")
 
 # RSI TOP
 async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
