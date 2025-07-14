@@ -51,6 +51,16 @@ def cleanup_cache():
         for key, _ in sorted_items[:10]:
             del moex_cache[key]
 
+
+def activate_caching_if_enabled():
+    ENABLE_CACHING = os.getenv("ENABLE_CACHING", "true").lower() == "true"
+    print(f"🔍 ENABLE_CACHING = {ENABLE_CACHING}")
+
+    if not ENABLE_CACHING:
+        print("ℹ️ Кэширование отключено через переменные окружения.")
+        return False
+
+
 def get_moex_data_with_cache(ticker="SBER", days=120):
     """Кэшированная версия get_moex_data"""
     cache_key = get_cache_key(ticker, days)
@@ -231,8 +241,9 @@ def enable_caching():
 #     enable_caching()
 
 # Добавляем функцию для отложенной активации
-def activate_caching_if_enabled():
-    """Активирует кэширование если включено в настройках"""
-    if ENABLE_CACHING:
-        return enable_caching()
-    return False
+
+
+
+
+    print("✅ Кэш успешно активирован")
+    return True  # ← ВОТ ЭТУ СТРОКУ ДОБАВЬ
