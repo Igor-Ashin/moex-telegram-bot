@@ -12,21 +12,7 @@ from scipy.signal import argrelextrema
 import asyncio
 import html
 
-# === ИНТЕГРАЦИЯ КЭШИРОВАНИЯ ===
-try:
-    import caching
-    print("✅ Модуль кэширования загружен успешно")
-    
-    # ДОБАВЬТЕ ЭТИ СТРОКИ:
-    if hasattr(caching, 'activate_caching_if_enabled'):
-        success = caching.activate_caching_if_enabled()
-        if success:
-            print("🎯 Кэширование активировано")
-        else:
-            print("⚠️ Кэширование не активировано")
-    
-except ImportError:
-    print("ℹ️ Модуль кэширования не найден, работаем без кэша")
+
 
 
 # Активация Токена Tinkoff
@@ -1723,7 +1709,23 @@ if Update and ContextTypes:
         result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
         
         await update.message.reply_text(result_text)
+
+    # === ИНТЕГРАЦИЯ КЭШИРОВАНИЯ ===
+try:
+    import caching
+    print("✅ Модуль кэширования загружен успешно")
     
+    # Явная активация
+    if hasattr(caching, 'activate_caching_if_enabled'):
+        success = caching.activate_caching_if_enabled()
+        if success:
+            print("🎯 Кэширование активировано")
+        else:
+            print("⚠️ Кэширование не активировано")
+
+except ImportError:
+    print("ℹ️ Модуль кэширования не найден, работаем без кэша")
+
 
     # Обработчики callback
     async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
