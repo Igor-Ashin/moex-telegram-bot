@@ -39,16 +39,6 @@ def set_webhook():
     else:
         print(f"Ошибка при установке webhook: {response.text}")
 
-# === ОТЛОЖЕННАЯ АКТИВАЦИЯ КЭШИРОВАНИЯ ===
-try:
-    if 'caching' in globals():
-        success = caching.activate_caching_if_enabled()
-        if success:
-            print("🎯 Кэширование активировано (отложенная активация)")
-        else:
-            print("⚠️ Отложенная активация кэширования не удалась")
-except Exception as e:
-    print(f"❌ Ошибка отложенной активации: {e}")
 
 
 if __name__ == "__main__":
@@ -1722,12 +1712,13 @@ if Update and ContextTypes:
         
         await update.message.reply_text(result_text)
 
-        # === ИНТЕГРАЦИЯ КЭШИРОВАНИЯ ===
+    # В конце файла, после всех функций, но перед if __name__ == '__main__':
+    
+    # === ИНТЕГРАЦИЯ КЭШИРОВАНИЯ ===
     try:
         import caching
         print("✅ Модуль кэширования загружен успешно")
         
-        # Явная активация
         if hasattr(caching, 'activate_caching_if_enabled'):
             success = caching.activate_caching_if_enabled()
             if success:
@@ -1737,6 +1728,7 @@ if Update and ContextTypes:
     
     except ImportError:
         print("ℹ️ Модуль кэширования не найден, работаем без кэша")
+
 
 
     # Обработчики callback
