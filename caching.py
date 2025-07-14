@@ -195,7 +195,7 @@ def enable_caching():
     """Включает кэширование, заменяя оригинальные функции"""
     try:
         import sys
-        
+        time.sleep(0.1)  # Задержка для полной загрузки main
         # Проверяем, что модуль main уже загружен
         if 'main' in sys.modules:
             main_module = sys.modules['main']
