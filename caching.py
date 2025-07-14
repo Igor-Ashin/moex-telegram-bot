@@ -60,6 +60,11 @@ def activate_caching_if_enabled():
         print("ℹ️ Кэширование отключено через переменные окружения.")
         return False
 
+    # ВКЛЮЧАЕМ КЭШ
+    success = enable_caching()
+    return success
+
+
 
 def get_moex_data_with_cache(ticker="SBER", days=120):
     """Кэшированная версия get_moex_data"""
