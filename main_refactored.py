@@ -21,6 +21,14 @@ from config.settings import settings
 # Импорты обработчиков
 from bot.handlers.basic import start, help_command
 
+# Импорты оптимизированных команд
+from bot.handlers.optimized_commands import (
+    start_command, clear_cache, cache_stats, 
+    warm_cache, rsi_top_optimized, ema_signals,
+    volume_scan, delta_scan
+)
+from bot.services.delta_analysis import calculate_single_delta
+
 # Импорты для будущего использования (когда создадим остальные модули)
 # from bot.handlers.analysis import chart_hv, stan, rsi_top
 # from bot.handlers.trading import cross_ema20x50, high_volume, moneyflow
@@ -32,13 +40,23 @@ def setup_handlers(app):
     Настройка обработчиков команд
     """
     # Основные команды
-    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("start", start_command))  # Используем оптимизированную версию
     app.add_handler(CommandHandler("help", help_command))
+    
+    # Оптимизированные команды анализа
+    app.add_handler(CommandHandler("rsi_top", rsi_top_optimized))
+    app.add_handler(CommandHandler("volume_scan", volume_scan))
+    app.add_handler(CommandHandler("delta_scan", delta_scan))
+    app.add_handler(CommandHandler("ema_signals", ema_signals))
+    
+    # Команды управления кэшем
+    app.add_handler(CommandHandler("cache_stats", cache_stats))
+    app.add_handler(CommandHandler("clear_cache", clear_cache))
+    app.add_handler(CommandHandler("warm_cache", warm_cache))
     
     # TODO: Добавить остальные обработчики по мере создания модулей
     # app.add_handler(CommandHandler("chart_hv", chart_hv))
     # app.add_handler(CommandHandler("stan", stan))
-    # app.add_handler(CommandHandler("rsi_top", rsi_top))
     # app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
     # app.add_handler(CommandHandler("high_volume", high_volume))
     # app.add_handler(CallbackQueryHandler(handle_callback))

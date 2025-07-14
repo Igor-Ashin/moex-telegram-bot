@@ -61,7 +61,7 @@ class MOEXClient:
             return pd.DataFrame()
     
     def get_weekly_data(self, ticker: str, weeks: int = 80) -> pd.DataFrame:
-        """Получение недельных данных (перенесено из main.py get_moex_weekly_data)"""
+        """Получение недельных данных (актуализированная версия из main.py)"""
         try:
             till = datetime.today().strftime('%Y-%m-%d')
             from_date = (datetime.today() - timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
@@ -77,7 +77,15 @@ class MOEXClient:
             response.raise_for_status()
             
             data = response.json()
-            return self._process_candles_data(data, weeks)
+            candles = data['candles']['data']
+            columns = data['candles']['columns']
+            df = pd.DataFrame(candles, columns=columns)
+            df['begin'] = pd.to_datetime(df['begin'])
+            df = df.sort_values('begin')
+            df.set_index('begin', inplace=True)
+            df = df.rename(columns={'close': 'close'})
+            df = df[['close']].dropna()
+            return df.tail(weeks)
             
         except Exception as e:
             logger.error(f"Error fetching weekly data for {ticker}: {e}")

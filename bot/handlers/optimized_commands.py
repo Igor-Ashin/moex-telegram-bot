@@ -9,6 +9,7 @@ from data.optimized_moex_client import optimized_moex_client
 from analysis.indicators import analyze_indicators
 from config.sectors import get_all_tickers, get_sector_tickers
 from data.cache import cache
+from bot.services.delta_analysis import calculate_single_delta, delta_analyzer
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ async def start_optimized(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "**Анализ рынка:**\n"
         "/rsi_top — RSI анализ (оптимизированный)\n"
         "/volume_scan — Поиск аномальных объемов\n"
+        "/delta_scan — Дельта-сигналы денежного потока\n"
         "/ema_signals — Сигналы по EMA пересечениям\n\n"
         
         "**Настройки:**\n"
@@ -331,3 +333,44 @@ async def volume_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error in volume_scan: {e}")
         await message.edit_text("❌ Ошибка при сканировании объемов")
+
+@telegram_handler
+@typing_action
+async def delta_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Сканирование дельта-сигналов по денежному потоку"""
+    message = await update.message.reply_text("🔍 Ищу сигналы по дельте денежного потока...")
+    
+    try:
+        # Используем популярные тикеры для быстрого сканирования
+        scan_tickers = [
+            "SBER", "GAZP", "LKOH", "YDEX", "MGNT", "ROSN", "NVTK", "VTBR", 
+            "ALRS", "MTSS", "MOEX", "PIKK", "T", "NLMK", "CHMF", "PHOR",
+            "RUAL", "GMKN", "TATN", "SNGS", "X5", "OZON"
+        ]
+        
+        # Сканируем возможности за 10 дней
+        opportunities = delta_analyzer.scan_delta_opportunities(scan_tickers, days=10)
+        
+        response = "💰 **Дельта-сигналы денежного потока** (10 дней)\n\n"
+        
+        if opportunities:
+            response += "🟢 **Найденные возможности:**\n"
+            response += "`Тикер  Δ%   Поток млн  EMA  SMA30W`\n"
+            
+            for opp in opportunities[:8]:  # Топ-8 сигналов
+                ema_signal = "🟢" if opp['ema20x50_long'] else "🔴"
+                sma_signal = "🟢" if opp['price_above_sma30_weekly'] else "🔴"
+                
+                response += f"`{opp['ticker']:<6} {opp['price_change_pct']:>4.1f}% {opp['ad_delta_millions']:>8.0f}    {ema_signal}   {sma_signal}`\n"
+            
+            response += "\n🟢 - Позитивный сигнал | 🔴 - Негативный сигнал\n"
+            response += "EMA - тренд EMA20x50 | SMA30W - позиция относительно SMA30 недельной"
+        else:
+            response += "ℹ️ Сильных дельта-сигналов не найдено\n"
+            response += "Попробуйте позже или используйте /delta для анализа конкретной акции"
+        
+        await message.edit_text(response, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error in delta_scan: {e}")
+        await message.edit_text("❌ Ошибка при сканировании дельта-сигналов")

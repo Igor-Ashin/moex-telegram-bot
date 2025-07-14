@@ -224,6 +224,50 @@ class OptimizedMOEXClient:
             'total_api_time': f"{self._stats['total_time']:.3f}s"
         }
     
+    def get_weekly_data(self, ticker: str, weeks: int = 80) -> pd.DataFrame:
+        """Получение недельных данных с кэшированием"""
+        # Проверяем кэш
+        cached_df = cache.get_market_data(ticker, "weekly", weeks)
+        if cached_df is not None:
+            self._stats['cache_hits'] += 1
+            return cached_df
+        
+        try:
+            self._stats['api_calls'] += 1
+            till = datetime.today().strftime('%Y-%m-%d')
+            from_date = (datetime.today() - timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
+            
+            url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json"
+            params = {
+                'interval': 7,
+                'from': from_date,
+                'till': till
+            }
+            
+            response = self.session.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            
+            data = response.json()
+            candles = data['candles']['data']
+            columns = data['candles']['columns']
+            df = pd.DataFrame(candles, columns=columns)
+            df['begin'] = pd.to_datetime(df['begin'])
+            df = df.sort_values('begin')
+            df.set_index('begin', inplace=True)
+            df = df.rename(columns={'close': 'close'})
+            df = df[['close']].dropna()
+            df = df.tail(weeks)
+            
+            # Кэшируем с длинным TTL для недельных данных
+            if not df.empty:
+                cache.set_market_data(ticker, "weekly", weeks, df, ttl=3600)  # 1 час
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error fetching weekly data for {ticker}: {e}")
+            return pd.DataFrame()
+    
     def close(self):
         """Закрытие сессии"""
         self.session.close()

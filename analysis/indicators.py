@@ -38,26 +38,17 @@ def calculate_sma(df: pd.DataFrame, period: int) -> pd.Series:
     """Вычисление SMA"""
     return df['close'].rolling(window=period).mean()
 
-def calculate_money_ad(df: pd.DataFrame) -> pd.Series:
+def calculate_money_ad(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Вычисление Money Flow (A/D Line) - перенесено из main.py
+    Вычисление Money Flow (A/D Line) - актуализированная версия из main.py
     """
-    if df.empty or len(df) < 2:
-        return pd.Series([], dtype=float)
-    
-    # Money Flow Multiplier
-    mf_multiplier = ((df['close'] - df['low']) - (df['high'] - df['close'])) / (df['high'] - df['low'])
-    
-    # Заменяем NaN на 0 (когда high == low)
-    mf_multiplier = mf_multiplier.fillna(0)
-    
-    # Money Flow Volume
-    mf_volume = mf_multiplier * df['volume']
-    
-    # Accumulation/Distribution Line
-    ad_line = mf_volume.cumsum()
-    
-    return ad_line
+    df = df.copy()
+    df['TYP'] = (df['high'] + df['low'] + df['close']) / 3
+    df['CLV'] = ((df['close'] - df['low']) - (df['high'] - df['close'])) / (df['high'] - df['low'])
+    df['CLV'] = df['CLV'].fillna(0)
+    df['money_flow'] = df['CLV'] * df['volume'] * df['TYP']
+    df['money_ad'] = df['money_flow'].cumsum()
+    return df
 
 def analyze_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -85,7 +76,7 @@ def analyze_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df['SMA30'] = calculate_sma(df, 30)
     
     # Money Flow
-    df['Money_AD'] = calculate_money_ad(df)
+    df = calculate_money_ad(df)
     
     return df
 
