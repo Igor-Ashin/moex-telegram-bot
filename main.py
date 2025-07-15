@@ -1198,77 +1198,81 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
 
         await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
 
-            # === ГРАФИК ===
-    print(f"🔧 Начинаю создание графика для {ticker}")
-    
-    try:
-        recent = df.tail(days + 1)
-        print(f"🔧 Данные для графика: {len(recent)} точек")
-    
-        # Вычисляем дельту денежного потока относительно начальной точки
-        money_ad_start = recent['money_ad'].iloc[0]
-        money_ad_delta = recent['money_ad'] - money_ad_start
+                # === ГРАФИК ===
+        print(f"🔧 Начинаю создание графика для {ticker}")
         
-        # Создаем график
-        fig, ax1 = plt.subplots(figsize=(12, 6))
-        
-        # Левая ось - цена
-        color1 = 'blue'
-        ax1.set_xlabel('Дата')
-        ax1.set_ylabel('Цена (₽)', color=color1)
-        line1 = ax1.plot(recent.index, recent['close'], label='Цена', color=color1, linewidth=2)
-        ax1.tick_params(axis='y', labelcolor=color1)
-        ax1.grid(True)
-        
-        # Правая ось - дельта денежного потока (начинается с 0)
-        ax2 = ax1.twinx()
-        
-        # Определяем цвет линии в зависимости от итоговой дельты
-        final_delta = money_ad_delta.iloc[-1] / 1_000_000
-        color2 = 'green' if final_delta >= 0 else 'red'
-        
-        ax2.set_ylabel('Δ Денежного потока (млн ₽)', color=color2)
-        line2 = ax2.plot(recent.index, money_ad_delta / 1_000_000, 
-                         label=f'Δ Денежного потока ({final_delta:+.0f} млн ₽)', 
-                         color=color2, linewidth=2)
-        ax2.tick_params(axis='y', labelcolor=color2)
-        
-        # Добавляем горизонтальную линию на уровне 0
-        ax2.axhline(y=0, color='gray', linestyle='--', alpha=0.7, linewidth=1)
-        
-        # Настройка заголовка
-        plt.title(f"{ticker} — Δ Денежного потока vs Цена ({days} дней)")
-        
-        # Легенда для обеих осей
-        lines = line1 + line2
-        labels = [l.get_label() for l in lines]
-        ax1.legend(lines, labels, loc='upper left')
-        
-        plt.tight_layout()
-        
-        # Сохраняем
-        filename = f"{ticker}_delta_chart.png"
-        plt.savefig(filename)
-        plt.close()
-        
-        print(f"✅ График сохранен: {filename}, итоговая дельта: {final_delta:+.0f} млн ₽")
-        
-        # Отправляем файл
         try:
-            with open(filename, "rb") as img:
-                await context.bot.send_photo(chat_id=chat_id, photo=img)
-            print("✅ График отправлен в чат")
+            recent = df.tail(days + 1)
+            print(f"🔧 Данные для графика: {len(recent)} точек")
+        
+            # Вычисляем дельту денежного потока относительно начальной точки
+            money_ad_start = recent['money_ad'].iloc[0]
+            money_ad_delta = recent['money_ad'] - money_ad_start
             
-            # Удаляем файл после отправки
+            # Создаем график
+            fig, ax1 = plt.subplots(figsize=(12, 6))
+            
+            # Левая ось - цена
+            color1 = 'blue'
+            ax1.set_xlabel('Дата')
+            ax1.set_ylabel('Цена (₽)', color=color1)
+            line1 = ax1.plot(recent.index, recent['close'], label='Цена', color=color1, linewidth=2)
+            ax1.tick_params(axis='y', labelcolor=color1)
+            ax1.grid(True)
+            
+            # Правая ось - дельта денежного потока (начинается с 0)
+            ax2 = ax1.twinx()
+            
+            # Определяем цвет линии в зависимости от итоговой дельты
+            final_delta = money_ad_delta.iloc[-1] / 1_000_000
+            color2 = 'green' if final_delta >= 0 else 'red'
+            
+            ax2.set_ylabel('Δ Денежного потока (млн ₽)', color=color2)
+            line2 = ax2.plot(recent.index, money_ad_delta / 1_000_000, 
+                             label=f'Δ Денежного потока ({final_delta:+.0f} млн ₽)', 
+                             color=color2, linewidth=2)
+            ax2.tick_params(axis='y', labelcolor=color2)
+            
+            # Добавляем горизонтальную линию на уровне 0
+            ax2.axhline(y=0, color='gray', linestyle='--', alpha=0.7, linewidth=1)
+            
+            # Настройка заголовка
+            plt.title(f"{ticker} — Δ Денежного потока vs Цена ({days} дней)")
+            
+            # Легенда для обеих осей
+            lines = line1 + line2
+            labels = [l.get_label() for l in lines]
+            ax1.legend(lines, labels, loc='upper left')
+            
+            plt.tight_layout()
+            
+            # Сохраняем
+            filename = f"{ticker}_delta_chart.png"
+            plt.savefig(filename)
+            plt.close()
+            
+            print(f"✅ График сохранен: {filename}, итоговая дельта: {final_delta:+.0f} млн ₽")
+            
+            # Отправляем файл
             try:
-                os.remove(filename)
-                print("✅ Временный файл удален")
-            except:
-                print("⚠️ Не удалось удалить временный файл")
+                with open(filename, "rb") as img:
+                    await context.bot.send_photo(chat_id=chat_id, photo=img)
+                print("✅ График отправлен в чат")
                 
+                # Удаляем файл после отправки
+                try:
+                    os.remove(filename)
+                    print("✅ Временный файл удален")
+                except:
+                    print("⚠️ Не удалось удалить временный файл")
+                    
+            except Exception as e:
+                print(f"❌ Ошибка при отправке графика: {e}")
+                await update.message.reply_text(f"⚠️ График создан, но не удалось отправить: {str(e)}")
         except Exception as e:
-            print(f"❌ Ошибка при отправке графика: {e}")
-            await update.message.reply_text(f"⚠️ График создан, но не удалось отправить: {str(e)}")
+            print(f"❌ Ошибка при создании графика: {e}")
+            plt.close()
+            await update.message.reply_text(f"⚠️ Ошибка при создании графика: {str(e)}")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
