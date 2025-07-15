@@ -684,6 +684,7 @@ if Update and ContextTypes:
             await update.message.reply_text("⚠️ Введите целое число, например: 10")
             return ASK_DELTA_DAYS
 
+    #/DELTA
     async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_TYPE, ticker: str, days: int):
         """Расчет дельты + график"""
         chat_id = update.effective_chat.id
@@ -759,33 +760,74 @@ if Update and ContextTypes:
             await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
     
             # === ГРАФИК ===
-            recent = df.tail(days + 1)
-    
-            plt.figure(figsize=(10, 5))
-            plt.plot(recent.index, recent['close'], label='Цена', color='blue', linewidth=2)
-            plt.plot(recent.index, recent['money_ad'], label='Денежный поток (A/D)', color='green', linewidth=2)
-            plt.title(f"{ticker} — Δ Денежного потока vs Цена")
-            plt.xlabel("Дата")
-            plt.ylabel("Значение")
-            plt.legend()
-            plt.grid(True)
-            plt.xticks(rotation=45)
-            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d.%m'))
-    
-            chart_path = f"/tmp/{ticker}_delta_chart.png"
-            plt.tight_layout()
-            plt.savefig(chart_path)
-            plt.close()
-            print("✅ Сохранил график:", chart_path)
+            print(f"🔧 Начинаю создание графика для {ticker}")
             
             try:
-                with open(chart_path, "rb") as img:
-                    await context.bot.send_photo(chat_id=chat_id, photo=img)
-                print("✅ Фото отправлено")
-            except Exception as e:
-                print(f"❌ Ошибка при отправке фото: {e}")
+                recent = df.tail(days + 1)
+                print(f"🔧 Данные для графика: {len(recent)} точек")
     
-            #os.remove(chart_path)
+                # Настройка matplotlib для работы без GUI
+                plt.switch_backend('Agg')
+                
+                fig, ax1 = plt.subplots(figsize=(10, 5))
+                
+                # Левая ось - цена
+                color1 = 'blue'
+                ax1.set_xlabel('Дата')
+                ax1.set_ylabel('Цена (₽)', color=color1)
+                line1 = ax1.plot(recent.index, recent['close'], label='Цена', color=color1, linewidth=2)
+                ax1.tick_params(axis='y', labelcolor=color1)
+                ax1.grid(True, alpha=0.3)
+                
+                # Правая ось - денежный поток
+                ax2 = ax1.twinx()
+                color2 = 'green'
+                ax2.set_ylabel('Денежный поток (A/D)', color=color2)
+                line2 = ax2.plot(recent.index, recent['money_ad'], label='Денежный поток (A/D)', color=color2, linewidth=2)
+                ax2.tick_params(axis='y', labelcolor=color2)
+                
+                # Настройка осей
+                plt.title(f"{ticker} — Δ Денежного потока vs Цена")
+                plt.xticks(rotation=45)
+                ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d.%m'))
+                
+                # Легенда для обеих осей
+                lines = line1 + line2
+                labels = [l.get_label() for l in lines]
+                ax1.legend(lines, labels, loc='upper left')
+    
+                # Используем текущую директорию вместо /tmp
+                chart_path = f"{ticker}_delta_chart.png"
+                fig.tight_layout()
+                fig.savefig(chart_path, dpi=100, bbox_inches='tight')
+                plt.close(fig)
+                print(f"✅ График сохранен: {chart_path}")
+                
+                # Проверяем, что файл создался
+                if os.path.exists(chart_path):
+                    print(f"✅ Файл существует, размер: {os.path.getsize(chart_path)} байт")
+                    
+                    try:
+                        with open(chart_path, "rb") as img:
+                            await context.bot.send_photo(chat_id=chat_id, photo=img)
+                        print("✅ График отправлен в чат")
+                    except Exception as e:
+                        print(f"❌ Ошибка при отправке графика: {e}")
+                        await update.message.reply_text(f"⚠️ График создан, но не удалось отправить: {str(e)}")
+                    
+                    # Удаляем файл после отправки
+                    try:
+                        os.remove(chart_path)
+                        print("✅ Временный файл удален")
+                    except:
+                        print("⚠️ Не удалось удалить временный файл")
+                else:
+                    print("❌ Файл графика не создался")
+                    await update.message.reply_text("⚠️ Не удалось создать график")
+                    
+            except Exception as e:
+                print(f"❌ Ошибка при создании графика: {e}")
+                await update.message.reply_text(f"⚠️ Ошибка при создании графика: {str(e)}")
     
         except Exception as e:
             await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
