@@ -685,58 +685,46 @@ if Update and ContextTypes:
             return ASK_DELTA_DAYS
 
     async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_TYPE, ticker: str, days: int):
-        """Рассчитывает дельту денежного потока для одной акции"""
-        await update.message.reply_text(f"🔍 Рассчитываю дельту денежного потока для {ticker} за {days} дней...")
-        
+        """Расчет дельты + график"""
+        chat_id = update.effective_chat.id
+        await update.message.reply_text(f"🔍 Рассчитываю дельту денежного потока для {ticker} за {days} дней с графиком...")
+    
         try:
             df = get_moex_data(ticker, days=100)
             if df.empty or len(df) < days + 1:
-                await update.message.reply_text(f"❌ Недостаточно данных для {ticker}. Попробуйте увеличить количество дней.")
+                await update.message.reply_text(f"❌ Недостаточно данных для {ticker}")
                 return
-
+    
             df = calculate_money_ad(df)
-
+    
             ad_start = df['money_ad'].iloc[-(days+1)]
             ad_end = df['money_ad'].iloc[-1]
             ad_delta = ad_end - ad_start
-
+    
             price_start = df['close'].iloc[-(days+1)]
             price_end = df['close'].iloc[-1]
             date_start = df.index[-(days+1)].strftime('%d.%m.%y')
             date_end = df.index[-1].strftime('%d.%m.%y')
-            
-            price_delta = price_end - price_start
-            price_pct = 100 * price_delta / price_start
-
-            # Фильтр по обороту
+            price_pct = 100 * (price_end - price_start) / price_start
+    
             filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
             filter_avg_turnover = filter_turnover_series.mean()
-            
-            # Среднедневной оборот за период
+    
             turnover_series = df['volume'].iloc[-days:] * df['close'].iloc[-days:]
             avg_turnover = turnover_series.mean()
-
-            # Сегодняшний оборот
-            today_volume = df['volume'].iloc[-1]
-            today_close = df['close'].iloc[-1]
-            today_turnover = today_volume * today_close
-            
+            today_turnover = df['volume'].iloc[-1] * df['close'].iloc[-1]
             ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
-
-            # EMA20/EMA50 Daily
+    
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
-            
             current_ema20 = df['EMA20'].iloc[-1]
             current_ema50 = df['EMA50'].iloc[-1]
             current_price = df['close'].iloc[-1]
-            
+    
             ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
             ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
-
             price_change_day = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
-
-            # SMA30 Weekly
+    
             try:
                 wdf = get_moex_weekly_data(ticker, weeks=80)
                 if len(wdf) >= 30:
@@ -748,39 +736,54 @@ if Update and ContextTypes:
                     price_above_sma30 = False
             except:
                 price_above_sma30 = False
-            
-            if avg_turnover != 0:
-                delta_pct = 100 * ad_delta / avg_turnover
-            else:
-                delta_pct = 0
-
-            # Формируем сообщение
+    
+            delta_pct = 100 * ad_delta / avg_turnover if avg_turnover else 0
+    
+            # Формируем текст
             msg = f"📊 *Анализ дельты денежного потока для {ticker}*\n"
             msg += f"📅 *Период: {date_start} – {date_end} ({days} дней)*\n\n"
-            
+    
             if filter_avg_turnover < 50_000_000:
-                msg += "⚠️ *Внимание: низкий среднедневной оборот (< 50 млн ₽)*\n\n"
-
-            if ema20x50_long:
-                ema_icon = "🟢"
-            elif ema20x50_short:
-                ema_icon = "🔴"
-            else:
-                ema_icon = "⚫"
-
-            sma_icon = "🟢" if price_above_sma30 else "🔴"
+                msg += "⚠️ *Низкий среднедневной оборот (< 50 млн ₽)*\n\n"
+    
             flow_icon = "🟢" if ad_delta > 0 else "🔴"
-            
-            msg += f"*Δ Цены за период:* {price_pct:+.1f}%\n"
+            ema_icon = "🟢" if ema20x50_long else ("🔴" if ema20x50_short else "⚫")
+            sma_icon = "🟢" if price_above_sma30 else "🔴"
+    
+            msg += f"*Δ Цены:* {price_pct:+.1f}%\n"
             msg += f"*Δ Потока:* {ad_delta/1_000_000:+.0f} млн ₽ {flow_icon}   *Δ / Оборот:* {delta_pct:.1f}%\n"
             msg += f"*Δ Цены 1D:* {price_change_day*100:+.1f}%   *Объём:* {ratio:.1f}x\n"
             msg += f"*EMA20x50:* {ema_icon}   *SMA30:* {sma_icon}\n\n"
-            msg += f"💰 *Среднедневной оборот:* {avg_turnover/1_000_000:.1f} млн ₽\n"
-            
-            await update.message.reply_text(msg, parse_mode="Markdown")
-            
+            msg += f"💰 *Среднедневной оборот:* {avg_turnover/1_000_000:.1f} млн ₽"
+    
+            await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown")
+    
+            # === ГРАФИК ===
+            recent = df.tail(days + 1)
+    
+            plt.figure(figsize=(10, 5))
+            plt.plot(recent.index, recent['close'], label='Цена', color='blue', linewidth=2)
+            plt.plot(recent.index, recent['money_ad'], label='Денежный поток (A/D)', color='green', linewidth=2)
+            plt.title(f"{ticker} — Δ Денежного потока vs Цена")
+            plt.xlabel("Дата")
+            plt.ylabel("Значение")
+            plt.legend()
+            plt.grid(True)
+            plt.xticks(rotation=45)
+            plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d.%m'))
+    
+            chart_path = f"{ticker}_delta_chart.png"
+            plt.tight_layout()
+            plt.savefig(chart_path)
+            plt.close()
+    
+            with open(chart_path, "rb") as img:
+                await context.bot.send_photo(chat_id=chat_id, photo=img)
+    
+            os.remove(chart_path)
+    
         except Exception as e:
-            await update.message.reply_text(f"❌ Ошибка при расчете дельты для {ticker}: {str(e)}")
+            await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
 
     # Основные команды анализа
     async def chart_hv(update: Update, context: ContextTypes.DEFAULT_TYPE):
