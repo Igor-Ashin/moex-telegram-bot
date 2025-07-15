@@ -772,15 +772,20 @@ if Update and ContextTypes:
             plt.xticks(rotation=45)
             plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d.%m'))
     
-            chart_path = f"{ticker}_delta_chart.png"
+            chart_path = f"/tmp/{ticker}_delta_chart.png"
             plt.tight_layout()
             plt.savefig(chart_path)
             plt.close()
+            print("✅ Сохранил график:", chart_path)
+            
+            try:
+                with open(chart_path, "rb") as img:
+                    await context.bot.send_photo(chat_id=chat_id, photo=img)
+                print("✅ Фото отправлено")
+            except Exception as e:
+                print(f"❌ Ошибка при отправке фото: {e}")
     
-            with open(chart_path, "rb") as img:
-                await context.bot.send_photo(chat_id=chat_id, photo=img)
-    
-            os.remove(chart_path)
+            #os.remove(chart_path)
     
         except Exception as e:
             await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
