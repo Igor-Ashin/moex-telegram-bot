@@ -608,7 +608,7 @@ if Update and ContextTypes:
         
         text = (
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
-            f"{cache_info}"
+            #f"{cache_info}"
             "Команды:\n"
             "/chart_hv — выбрать акцию через кнопки\n"
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
