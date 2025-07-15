@@ -8,9 +8,11 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from scipy.signal import argrelextrema
 import asyncio
 import html
+import concurrent.futures
 
 
 
@@ -186,6 +188,10 @@ def get_figi_by_ticker(ticker: str) -> str | None:
         print(f"Ошибка поиска FIGI для {ticker}: {e}")
         return None
 
+
+
+
+
 def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFrame:
     """Загружает 4H свечи по тикеру из Tinkoff Invest API"""
     try:
@@ -196,7 +202,7 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFra
             
         print(f"📡 Используем FIGI {figi} для загрузки данных {ticker}")
         
-        to_dt = datetime.utcnow()
+        to_dt = datetime.now(ZoneInfo("Europe/Moscow"))
         from_dt = to_dt - timedelta(days=days)
         
         with Client(TINKOFF_API_TOKEN) as client:
@@ -255,6 +261,31 @@ def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFra
     except Exception as e:
         print(f"❌ Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
+
+
+def fetch_4h_data_for_ticker(ticker, days=25):
+    try:
+        df = get_moex_data_4h_tinkoff(ticker, days=days)
+        if df is not None and not df.empty:
+            return ticker, df  # Можно вернуть df или len(df)
+        else:
+            return ticker, None
+    except Exception as e:
+        print(f"{ticker} error: {e}")
+        return ticker, None
+
+def parallel_get_4h_data(tickers, days=25, max_workers=10):
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_ticker = {
+            executor.submit(fetch_4h_data_for_ticker, ticker, days): ticker for ticker in tickers
+        }
+        for future in concurrent.futures.as_completed(future_to_ticker):
+            ticker, df = future.result()
+            results[ticker] = df
+    return results  # словарь: {ticker: DataFrame}
+    
+
 
 # === ТЕХНИЧЕСКИЕ ИНДИКАТОРЫ ===
 
@@ -954,76 +985,67 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 25 свечей...")
         print("▶ Запущена команда EMA CROSS")
         
-        # Контроль времени выполнения
         start_time = datetime.now()
         MAX_EXECUTION_TIME = 1500  # 25 минут
+        CONCURRENT_LIMIT = 10      # Количество одновременных задач
         
         all_tickers = sum(SECTORS1.values(), [])
         print(f"🔁 Всего тикеров для обработки: {len(all_tickers)}")
         
         long_hits, short_hits = [], []
         processed_count = 0
-        
-        # Обрабатываем тикеры с ограничением по времени
-        for ticker in all_tickers:
-            # Проверка времени выполнения
+
+        semaphore = asyncio.Semaphore(CONCURRENT_LIMIT)
+
+        async def sem_task(ticker):
+            async with semaphore:
+                try:
+                    result = await asyncio.wait_for(
+                        process_single_ticker(ticker),
+                        timeout=20.0  # 20 секунд на весь тикер
+                    )
+                    return ticker, result
+                except asyncio.TimeoutError:
+                    print(f"⏰ Таймаут для {ticker}")
+                    return ticker, None
+                except Exception as e:
+                    print(f"❌ Ошибка EMA для {ticker}: {e}")
+                    return ticker, None
+
+        # Запускаем задачи для всех тикеров
+        tasks = [sem_task(ticker) for ticker in all_tickers]
+
+        for future in asyncio.as_completed(tasks):
+            ticker, result = await future
+            processed_count += 1
+            
+            if result:
+                long_signal, short_signal = result
+                if long_signal:
+                    long_hits.append(long_signal)
+                    print(f"✅ Лонг сигнал: {long_signal[0]} на {long_signal[1]}")
+                if short_signal:
+                    short_hits.append(short_signal)
+                    print(f"✅ Шорт сигнал: {short_signal[0]} на {short_signal[1]}")
+            print(f"✅ Завершен анализ для {ticker}")
+
+            # Уведомление о прогрессе
+            if processed_count % 20 == 0:
+                try:
+                    progress_msg = f"⏳ Обработано {processed_count}/{len(all_tickers)} тикеров..."
+                    await update.message.reply_text(progress_msg)
+                    print(f"📱 Отправлено уведомление: {progress_msg}")
+                except Exception as progress_e:
+                    print(f"❌ Ошибка отправки прогресса: {progress_e}")
+
+            # Прерываем работу по лимиту времени
             if (datetime.now() - start_time).seconds > MAX_EXECUTION_TIME:
                 print(f"⏰ Превышено максимальное время выполнения ({MAX_EXECUTION_TIME} сек)")
                 break
-                
-            try:
-                print(f"🔁 Обрабатываем {ticker} ({processed_count + 1}/{len(all_tickers)})")
-                
-                # Принудительно сбрасываем буфер логов
-                import sys
-                sys.stdout.flush()
-                
-                # Добавляем timeout для каждого тикера
-                print(f"📡 Запрашиваем данные для {ticker}...")
-                
-                # Оборачиваем ВСЮ обработку тикера в timeout
-                ticker_result = await asyncio.wait_for(
-                    process_single_ticker(ticker),
-                    timeout=20.0  # 20 секунд на весь тикер
-                )
-                
-                if ticker_result:
-                    long_signal, short_signal = ticker_result
-                    if long_signal:
-                        long_hits.append(long_signal)
-                        print(f"✅ Лонг сигнал: {long_signal[0]} на {long_signal[1]}")
-                    if short_signal:
-                        short_hits.append(short_signal)
-                        print(f"✅ Шорт сигнал: {short_signal[0]} на {short_signal[1]}")
-                
-                print(f"✅ Завершен анализ для {ticker}")
-                processed_count += 1
-                
-                # Отправляем промежуточное уведомление каждые 20 тикеров
-                if processed_count % 20 == 0:
-                    try:
-                        progress_msg = f"⏳ Обработано {processed_count}/{len(all_tickers)} тикеров..."
-                        await update.message.reply_text(progress_msg)
-                        print(f"📱 Отправлено уведомление: {progress_msg}")
-                    except Exception as progress_e:
-                        print(f"❌ Ошибка отправки прогресса: {progress_e}")
-                
-                # Небольшая задержка между запросами + принудительный сброс буфера
-                await asyncio.sleep(0.5)  # Увеличиваем задержку для API Tinkoff
-                sys.stdout.flush()
-                
-            except asyncio.TimeoutError:
-                print(f"⏰ Таймаут для {ticker}")
-                sys.stdout.flush()
-                continue
-            except Exception as e:
-                print(f"❌ Ошибка EMA для {ticker}: {e}")
-                sys.stdout.flush()
-                continue
-        
+
         print(f"✅ Обработано тикеров: {processed_count}/{len(all_tickers)}")
         
-        # Сортировка по дате (новые вверх)
+        # Сортировка результатов
         try:
             long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
             short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
@@ -1049,8 +1071,6 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += "\n".join(f"{t} {d}" for t, d in short_hits)+ "\n\n"
         else:
             msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*\n\n"
-        #msg += "\n"
-        # Добавляем итоговый список тикеров внизу
         if long_hits or short_hits:
             tickers_summary = []
             if long_hits:
@@ -1061,7 +1081,6 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 tickers_summary.append(f"*Шорт:* {short_tickers}")
             msg += "\n" + "\n".join(tickers_summary)
         
-        # Отправляем результат
         await update.message.reply_text(msg, parse_mode="Markdown")
         print("✅ Команда EMA CROSS завершена успешно")
         
