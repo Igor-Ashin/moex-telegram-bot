@@ -210,10 +210,10 @@ def enable_caching():
     """Включает кэширование, заменяя оригинальные функции"""
     try:
         import sys
-        time.sleep(0.1)  # Задержка для полной загрузки main
-        # Проверяем, что модуль main уже загружен
-        if 'main' in sys.modules:
-            main_module = sys.modules['main']
+        time.sleep(0.3)  # Задержка для полной загрузки main
+                # Проверяем, что модуль main уже загружен
+        if '__main__' in sys.modules:
+            main_module = sys.modules['__main__']
             
             # Проверяем наличие функций и заменяем их
             if hasattr(main_module, 'get_moex_data'):
@@ -234,7 +234,7 @@ def enable_caching():
             print("✅ Кэширование включено успешно")
             return True
         else:
-            print("⚠️ Модуль main еще не загружен")
+            print("⚠️ Модуль __main__ еще не загружен")
             return False
             
     except Exception as e:
