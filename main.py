@@ -1268,8 +1268,8 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
             print(f"❌ Ошибка при создании графика: {e}")
             await update.message.reply_text(f"⚠️ Ошибка при создании графика: {str(e)}")
     
-        except Exception as e:
-            await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
 
 # RSI TOP
 async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
