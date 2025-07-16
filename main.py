@@ -729,7 +729,7 @@ if Update and ContextTypes:
                 current_price = df['close'].iloc[-1]
                 
                 ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
-                
+                ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
                 price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
                 
                 # SMA30 Weekly
@@ -779,7 +779,7 @@ if Update and ContextTypes:
         msg += "-" * 60 + "\n"
         
         for ticker, price, delta, ratio, ema_signal, sma_signal, mf_icon, mf_str in rows:
-            ema_icon = "🟢" if ema_signal else "🔴"
+            ema_icon = "🟢" if ema20x50_long else ("🔴" if ema20x50_short else "⚫")
             sma_icon = "🟢" if sma_signal else "🔴"
             
             msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>6} {sma_icon:>4} {mf_icon}{mf_str:>6}\n"
