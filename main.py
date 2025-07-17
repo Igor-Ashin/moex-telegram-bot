@@ -757,6 +757,7 @@ if Update and ContextTypes:
                     price_change, 
                     ratio, 
                     ema20x50_long, 
+                    ema20x50_short,
                     price_above_sma30,
                     money_flow_icon,
                     money_flow_str
@@ -778,7 +779,7 @@ if Update and ContextTypes:
         msg += f"{'Тикер':<6} {'Цена':>8} {'Δ Цены':>7} {'Объём':>6} {'ema20x50':>6} {'sma30':>6} {'Δ Потока':>10}\n"
         msg += "-" * 60 + "\n"
         
-        for ticker, price, delta, ratio, ema_signal, sma_signal, mf_icon, mf_str in rows:
+        for ticker, price, delta, ratio, ema20x50_long, ema20x50_short, sma_signal, mf_icon, mf_str in rows:
             ema_icon = "🟢" if ema20x50_long else ("🔴" if ema20x50_short else "⚫")
             sma_icon = "🟢" if sma_signal else "🔴"
             
