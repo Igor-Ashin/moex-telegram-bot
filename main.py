@@ -878,7 +878,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
             tickers_summary.append(f"*Лонг:* {long_tickers}")
         if short_hits:
             short_tickers = ", ".join(t for t, _ in short_hits)
-            tickers_summary.append(f"*Шорт:* {short_tickers}")
+            tickers_summary.append(f"\n*Шорт:* {short_tickers}")
         msg += "\n" + "\n".join(tickers_summary)
 
     await update.message.reply_text(msg, parse_mode="Markdown")
@@ -993,7 +993,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 tickers_summary.append(f"*Лонг:* {long_tickers}")
             if short_hits:
                 short_tickers = ", ".join(t for t, _ in short_hits)
-                tickers_summary.append(f"*Шорт:* {short_tickers}")
+                tickers_summary.append(f"\n*Шорт:* {short_tickers}")
             msg += "\n" + "\n".join(tickers_summary)
         
         # Отправляем результат
