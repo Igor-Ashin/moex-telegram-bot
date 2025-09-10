@@ -794,7 +794,7 @@ if Update and ContextTypes:
 
 
 async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 14 дней...")
+    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 50 дней...")
     long_hits, short_hits = [], []
     today = datetime.today().date()
     
@@ -808,7 +808,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
             
             # Получаем данные за последние 15 дней для анализа
-            recent = df.tail(15)  # 14 дней + текущий
+            recent = df.tail(51)  # 50 дней + текущий
             
             # Текущие значения
             current_close = df['close'].iloc[-1]
