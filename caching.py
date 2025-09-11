@@ -24,7 +24,7 @@ figi_cache = {}
 #    return time.time() - cache_entry['timestamp'] < ttl_seconds
 
 #def cleanup_cache():
-    """Удаляет устаревшие записи из кэша"""
+#    """Удаляет устаревшие записи из кэша"""
 #    current_time = time.time()
 """    
     # Очистка основного кэша
