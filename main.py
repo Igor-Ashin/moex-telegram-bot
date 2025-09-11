@@ -104,8 +104,8 @@ async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
             stats = caching.get_cache_stats()
             msg = f"🔍 **Отладка кэширования:**\n\n"
             msg += f"📊 Статистика:\n"
-            msg += f"• MOEX кэш: {stats['moex_entries']} записей\n"
-            msg += f"• Weekly кэш: {stats['weekly_entries']} записей\n"
+            #msg += f"• MOEX кэш: {stats['moex_entries']} записей\n"
+            #msg += f"• Weekly кэш: {stats['weekly_entries']} записей\n"
             msg += f"• FIGI кэш: {stats['figi_entries']} записей\n"
             msg += f"• Общий размер: {stats['size_mb']} MB\n\n"
             
@@ -114,8 +114,8 @@ async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 'main' in sys.modules:
                 main_module = sys.modules['main']
                 msg += f"🔧 Замена функций:\n"
-                msg += f"• get_moex_data: {'✅' if hasattr(main_module, '_original_get_moex_data') else '❌'}\n"
-                msg += f"• get_moex_weekly_data: {'✅' if hasattr(main_module, '_original_get_moex_weekly_data') else '❌'}\n"
+                #msg += f"• get_moex_data: {'✅' if hasattr(main_module, '_original_get_moex_data') else '❌'}\n"
+                #msg += f"• get_moex_weekly_data: {'✅' if hasattr(main_module, '_original_get_moex_weekly_data') else '❌'}\n"
                 msg += f"• get_figi_by_ticker: {'✅' if hasattr(main_module, '_original_get_figi_by_ticker') else '❌'}\n"
         else:
             msg = "❌ Модуль caching не загружен"
@@ -935,7 +935,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 processed_count += 1
                 
                 # Отправляем промежуточное уведомление каждые 20 тикеров
-                if processed_count % 20 == 0:
+                if processed_count % 40 == 0:
                     try:
                         progress_msg = f"⏳ Обработано {processed_count}/{len(all_tickers)} тикеров..."
                         await update.message.reply_text(progress_msg)
