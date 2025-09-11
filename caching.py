@@ -7,26 +7,26 @@ import pandas as pd
 import requests
 
 # Конфигурация кэширования
-CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))  # 5 минут
-WEEKLY_CACHE_TTL = int(os.getenv("WEEKLY_CACHE_TTL", "600"))  # 10 минут
-MAX_CACHE_ENTRIES = int(os.getenv("MAX_CACHE_ENTRIES", "50"))
+#CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))  # 5 минут
+#WEEKLY_CACHE_TTL = int(os.getenv("WEEKLY_CACHE_TTL", "600"))  # 10 минут
+#MAX_CACHE_ENTRIES = int(os.getenv("MAX_CACHE_ENTRIES", "1000"))
 ENABLE_CACHING = os.getenv("ENABLE_CACHING", "true").lower() == "true"
 
 # Глобальные кэши
-moex_cache = {}
-weekly_cache = {}
+#moex_cache = {}
+#weekly_cache = {}
 figi_cache = {}
 
-def get_cache_key(ticker, days):
-    return f"moex_{ticker}_{days}"
+#def get_cache_key(ticker, days):
+#    return f"moex_{ticker}_{days}"
 
-def is_cache_valid(cache_entry, ttl_seconds):
-    return time.time() - cache_entry['timestamp'] < ttl_seconds
+#def is_cache_valid(cache_entry, ttl_seconds):
+#    return time.time() - cache_entry['timestamp'] < ttl_seconds
 
-def cleanup_cache():
+#def cleanup_cache():
     """Удаляет устаревшие записи из кэша"""
-    current_time = time.time()
-    
+#    current_time = time.time()
+"""    
     # Очистка основного кэша
     keys_to_remove = []
     for key, entry in list(moex_cache.items()):
@@ -51,7 +51,7 @@ def cleanup_cache():
         for key, _ in sorted_items[:10]:
             del moex_cache[key]
 
-
+"""
 def activate_caching_if_enabled():
     ENABLE_CACHING = os.getenv("ENABLE_CACHING", "true").lower() == "true"
     print(f"🔍 ENABLE_CACHING = {ENABLE_CACHING}")
@@ -65,7 +65,7 @@ def activate_caching_if_enabled():
     return success
 
 
-
+"""
 def get_moex_data_with_cache(ticker="SBER", days=120):
     """Кэшированная версия get_moex_data"""
     cache_key = get_cache_key(ticker, days)
@@ -115,7 +115,8 @@ def get_moex_data_with_cache(ticker="SBER", days=120):
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
-
+"""
+"""
 def get_moex_weekly_data_with_cache(ticker="SBER", weeks=80):
     """Кэшированная версия get_moex_weekly_data"""
     cache_key = f"weekly_{ticker}_{weeks}"
@@ -157,7 +158,7 @@ def get_moex_weekly_data_with_cache(ticker="SBER", weeks=80):
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
-
+"""
 def get_figi_by_ticker_with_cache(ticker: str) -> str | None:
     """Кэшированная версия get_figi_by_ticker"""
     if ticker in figi_cache:
@@ -188,21 +189,21 @@ def get_cache_stats():
     import sys
     
     print(f"🔍 Отладка кэша:")
-    print(f"   moex_cache: {len(moex_cache)} записей")
-    print(f"   weekly_cache: {len(weekly_cache)} записей") 
+   # print(f"   moex_cache: {len(moex_cache)} записей")
+   # print(f"   weekly_cache: {len(weekly_cache)} записей") 
     print(f"   figi_cache: {len(figi_cache)} записей")
     
-    moex_size = sys.getsizeof(moex_cache) / 1024 / 1024
-    weekly_size = sys.getsizeof(weekly_cache) / 1024 / 1024
+   # moex_size = sys.getsizeof(moex_cache) / 1024 / 1024
+   # weekly_size = sys.getsizeof(weekly_cache) / 1024 / 1024
     figi_size = sys.getsizeof(figi_cache) / 1024 / 1024
     
     return {
-        'moex_entries': len(moex_cache),
-        'weekly_entries': len(weekly_cache),
+      #  'moex_entries': len(moex_cache),
+      #  'weekly_entries': len(weekly_cache),
         'figi_entries': len(figi_cache),
-        'total_size_mb': round(moex_size + weekly_size + figi_size, 2),
-        'entries': len(moex_cache) + len(weekly_cache) + len(figi_cache),
-        'size_mb': round(moex_size + weekly_size + figi_size, 2)
+        'total_size_mb': round(figi_size, 2),
+        'entries': len(figi_cache),
+        'size_mb': round(figi_size, 2)
     }
 
 
@@ -210,12 +211,13 @@ def enable_caching():
     """Включает кэширование, заменяя оригинальные функции"""
     try:
         import sys
-        time.sleep(0.3)  # Задержка для полной загрузки main
+        time.sleep(0.5)  # Задержка для полной загрузки main
                 # Проверяем, что модуль main уже загружен
         if '__main__' in sys.modules:
             main_module = sys.modules['__main__']
             
             # Проверяем наличие функций и заменяем их
+            """
             if hasattr(main_module, 'get_moex_data'):
                 print(f"🔄 Заменяем get_moex_data на кэшированную версию")
                 main_module._original_get_moex_data = main_module.get_moex_data
@@ -225,7 +227,7 @@ def enable_caching():
                 print(f"🔄 Заменяем get_moex_weekly_data на кэшированную версию")
                 main_module._original_get_moex_weekly_data = main_module.get_moex_weekly_data
                 main_module.get_moex_weekly_data = get_moex_weekly_data_with_cache
-                
+            """    
             if hasattr(main_module, 'get_figi_by_ticker'):
                 print(f"🔄 Заменяем get_figi_by_ticker на кэшированную версию")
                 main_module._original_get_figi_by_ticker = main_module.get_figi_by_ticker
