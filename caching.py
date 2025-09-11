@@ -67,7 +67,7 @@ def activate_caching_if_enabled():
 
 """
 def get_moex_data_with_cache(ticker="SBER", days=120):
-    """Кэшированная версия get_moex_data"""
+   # """Кэшированная версия get_moex_data"""
     cache_key = get_cache_key(ticker, days)
     
     # Проверяем кэш
