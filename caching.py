@@ -24,7 +24,7 @@ figi_cache = {}
 #    return time.time() - cache_entry['timestamp'] < ttl_seconds
 
 #def cleanup_cache():
-#    """Удаляет устаревшие записи из кэша"""
+#    Удаляет устаревшие записи из кэша
 #    current_time = time.time()
 """    
     # Очистка основного кэша
@@ -67,7 +67,7 @@ def activate_caching_if_enabled():
 
 """
 def get_moex_data_with_cache(ticker="SBER", days=120):
-   # """Кэшированная версия get_moex_data"""
+   # Кэшированная версия get_moex_data
     cache_key = get_cache_key(ticker, days)
     
     # Проверяем кэш
@@ -118,7 +118,7 @@ def get_moex_data_with_cache(ticker="SBER", days=120):
 """
 """
 def get_moex_weekly_data_with_cache(ticker="SBER", weeks=80):
-    """Кэшированная версия get_moex_weekly_data"""
+    #Кэшированная версия get_moex_weekly_data
     cache_key = f"weekly_{ticker}_{weeks}"
     
     if cache_key in weekly_cache:
@@ -160,7 +160,7 @@ def get_moex_weekly_data_with_cache(ticker="SBER", weeks=80):
         return pd.DataFrame()
 """
 def get_figi_by_ticker_with_cache(ticker: str) -> str | None:
-    """Кэшированная версия get_figi_by_ticker"""
+    #Кэшированная версия get_figi_by_ticker
     if ticker in figi_cache:
         print(f"📋 FIGI для {ticker} взят из кэша")
         return figi_cache[ticker]
@@ -185,7 +185,7 @@ def get_figi_by_ticker_with_cache(ticker: str) -> str | None:
         return None
 
 def get_cache_stats():
-    """Возвращает статистику кэша"""
+    #Возвращает статистику кэша
     import sys
     
     print(f"🔍 Отладка кэша:")
@@ -208,7 +208,7 @@ def get_cache_stats():
 
 
 def enable_caching():
-    """Включает кэширование, заменяя оригинальные функции"""
+    #Включает кэширование, заменяя оригинальные функции
     try:
         import sys
         time.sleep(0.5)  # Задержка для полной загрузки main
