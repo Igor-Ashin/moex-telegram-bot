@@ -891,7 +891,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Контроль времени выполнения
         start_time = datetime.now()
-        MAX_EXECUTION_TIME = 1500  # 25 минут
+        MAX_EXECUTION_TIME = 1800  # 30 минут
         
         all_tickers = sum(SECTORS1.values(), [])
         print(f"🔁 Всего тикеров для обработки: {len(all_tickers)}")
@@ -935,7 +935,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 processed_count += 1
                 
                 # Отправляем промежуточное уведомление каждые 20 тикеров
-                if processed_count % 40 == 0:
+                if processed_count % 20 == 0:
                     try:
                         progress_msg = f"⏳ Обработано {processed_count}/{len(all_tickers)} тикеров..."
                         await update.message.reply_text(progress_msg)
@@ -944,7 +944,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         print(f"❌ Ошибка отправки прогресса: {progress_e}")
                 
                 # Небольшая задержка между запросами + принудительный сброс буфера
-                await asyncio.sleep(0.5)  # Увеличиваем задержку для API Tinkoff
+                await asyncio.sleep(0.8)  # Увеличиваем задержку для API Tinkoff
                 sys.stdout.flush()
                 
             except asyncio.TimeoutError:
