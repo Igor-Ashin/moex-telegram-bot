@@ -600,18 +600,18 @@ def find_sma30_crossover_week(ticker, weeks=5):
 # === TELEGRAM КОМАНДЫ ===
 
 if Update and ContextTypes:
-"""    
+    
     # Функция для получения статистики кэша
-    def get_cache_stats():
+#    def get_cache_stats():
         #Возвращает статистику кэша если модуль загружен
-        try:
-            if 'caching' in globals():
-                return caching.get_cache_stats()
-            else:
-                return {'entries': 0, 'size_mb': 0, 'status': 'disabled'}
-        except:
-            return {'entries': 0, 'size_mb': 0, 'status': 'error'}
-    """
+#        try:
+#            if 'caching' in globals():
+ #               return caching.get_cache_stats()
+  #          else:
+  #              return {'entries': 0, 'size_mb': 0, 'status': 'disabled'}
+  #      except:
+   #         return {'entries': 0, 'size_mb': 0, 'status': 'error'}
+    
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Закомментированный код кэша
         # cache_stats = get_cache_stats()
