@@ -13,21 +13,7 @@ from scipy.signal import argrelextrema
 import asyncio
 import html
 import concurrent.futures
-from caching import figi_cache, get_figi_by_ticker_with_cache
-from aiohttp import web
 
-
-# Telegram импорты
-try:
-    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
-    from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
-except ModuleNotFoundError:
-    print("Библиотека 'python-telegram-bot' не установлена.")
-    Update = None
-    ApplicationBuilder = None
-    CommandHandler = None
-    CallbackQueryHandler = None
-    ContextTypes = None
 
 
 
@@ -56,57 +42,21 @@ def set_webhook():
         print(f"Ошибка при установке webhook: {response.text}")
 
 
-# --- Healthcheck ---
-async def healthcheck(request):
-    return web.Response(text="OK", status=200)
-
-async def start_health_server():
-    app = web.Application()
-    app.router.add_get("/health", healthcheck)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8081)
-    await site.start()
-
-# --- Telegram Bot ---
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-if not TOKEN:
-    print("❌ TELEGRAM_TOKEN не установлен.")
-    exit()
-
-PORT = int(os.getenv("PORT", 8080))
-WEBHOOK_PATH = TOKEN
-WEBHOOK_URL = f"https://moex-telegram-bot-sra8.onrender.com/{WEBHOOK_PATH}"
-
-app = ApplicationBuilder().token(TOKEN).build()
-
-
-# --- Асинхронный запуск ---
-async def main():
-    # Запускаем healthcheck сервер параллельно
-    asyncio.create_task(start_health_server())
-
-    # Запускаем телеграм бота вручную
-    await app.initialize()
-    await app.start()
-    await app.start_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=WEBHOOK_PATH,
-        webhook_url=WEBHOOK_URL
-    )
-
-    print(f"🚀 Бот запущен по адресу {WEBHOOK_URL}")
-
-    # Ожидаем завершения (работаем до SIGTERM на Render)
-    await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    asyncio.run(main())
-#if __name__ == "__main__":
-#    set_webhook()
+    set_webhook()
 
-
+# Telegram импорты
+try:
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
+    from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, MessageHandler, filters
+except ModuleNotFoundError:
+    print("Библиотека 'python-telegram-bot' не установлена.")
+    Update = None
+    ApplicationBuilder = None
+    CommandHandler = None
+    CallbackQueryHandler = None
+    ContextTypes = None
 
 # Секторы акций
 SECTORS = {
