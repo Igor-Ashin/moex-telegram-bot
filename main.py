@@ -65,43 +65,39 @@ async def start_health_server():
     app.router.add_get("/health", healthcheck)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8081)  # отдельный порт
+    site = web.TCPSite(runner, "0.0.0.0", 8081)
     await site.start()
 
 # --- Main ---
-if __name__ == "__main__":
-    TOKEN = os.getenv("TELEGRAM_TOKEN")
-    if not TOKEN:
-        print("❌ TELEGRAM_TOKEN не установлен.")
-        exit()
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+if not TOKEN:
+    print("❌ TELEGRAM_TOKEN не установлен.")
+    exit()
 
-    PORT = int(os.getenv("PORT", 8080))
-    WEBHOOK_PATH = TOKEN
-    WEBHOOK_URL = f"https://moex-telegram-bot-sra8.onrender.com/{WEBHOOK_PATH}"
+PORT = int(os.getenv("PORT", 8080))
+WEBHOOK_PATH = TOKEN
+WEBHOOK_URL = f"https://moex-telegram-bot-sra8.onrender.com/{WEBHOOK_PATH}"
 
-    # Создаем бота
-    app = ApplicationBuilder().token(TOKEN).build()
+# Создаем бота
+app = ApplicationBuilder().token(TOKEN).build()
 
-    # Команда /start
-    async def start(update, context):
-        await update.message.reply_text("Бот запущен!")
+# Команда /start
+async def start(update, context):
+    await update.message.reply_text("Бот запущен!")
 
-    app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("start", start))
 
-    # Запуск webhook вместе с healthcheck
-    async def main():
-        # Старт healthcheck сервера параллельно
-        asyncio.create_task(start_health_server())
-        # Запуск бота с webhook
-        await app.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            url_path=WEBHOOK_PATH,
-            webhook_url=WEBHOOK_URL
-        )
+# Старт healthcheck сервера параллельно
+loop = asyncio.get_event_loop()
+loop.create_task(start_health_server())
 
-    asyncio.run(main())
-
+# Запуск webhook (не через asyncio.run)
+app.run_webhook(
+    listen="0.0.0.0",
+    port=PORT,
+    url_path=WEBHOOK_PATH,
+    webhook_url=WEBHOOK_URL
+)
 #if __name__ == "__main__":
 #    set_webhook()
 
