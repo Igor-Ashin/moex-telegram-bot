@@ -816,54 +816,37 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data(ticker, days=100)  # достаточно для расчета EMA
+            df = get_moex_data(ticker, days=100)  # оставляем как есть
             if df.empty or len(df) < 100:
                 continue
-                
+            
+            # Расчёт EMA
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
             
-            # Получаем данные за последние 15 дней для анализа
-            recent = df.tail(51)  # 50 дней + текущий
+            # Берём последние 51 день для анализа
+            recent = df.tail(51)
+            ema20 = recent['EMA20']
+            ema50 = recent['EMA50']
+            close = recent['close']
             
-            # Текущие значения
-            current_close = df['close'].iloc[-1]
-            current_ema20 = df['EMA20'].iloc[-1]
-            current_ema50 = df['EMA50'].iloc[-1]
+            prev_ema20 = ema20.shift(1)
+            prev_ema50 = ema50.shift(1)
             
-            # Проверяем пересечения за последние 50 дней
-            for i in range(1, len(recent)):
-                prev_ema20 = recent['EMA20'].iloc[i-1]
-                prev_ema50 = recent['EMA50'].iloc[i-1]
-                curr_ema20 = recent['EMA20'].iloc[i]
-                curr_ema50 = recent['EMA50'].iloc[i]
-                curr_close = recent['close'].iloc[i]  # Цена в день пересечения
-                
-                # Получаем дату для текущего дня
-                date = recent.index[i].strftime('%d.%m.%Y')
-                
-                # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
-                if (
-                    prev_ema20 <= prev_ema50
-                    and curr_ema20 > curr_ema50
-                    and curr_close > curr_ema20
-                    and current_close > current_ema20
-                    and current_ema20 > current_ema50
-                ):
-                    long_hits.append((ticker, date))
-                    break  # Только одно пересечение за период
-        
-                # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
-                elif (
-                    prev_ema20 >= prev_ema50
-                    and curr_ema20 < curr_ema50
-                    and curr_close < curr_ema20
-                    and current_close < current_ema20
-                    and current_ema20 < current_ema50
-                ):
-                    short_hits.append((ticker, date))
-                    break  # Только одно пересечение за период
-                    
+            # Лонг-пересечение EMA20 снизу вверх
+            cross_up = (prev_ema20 <= prev_ema50) & (ema20 > ema50)
+            confirmed_up = cross_up & (close > ema20) & (ema20 > ema50)
+            if confirmed_up.any():
+                date = confirmed_up[confirmed_up].index[0].strftime('%d.%m.%Y')
+                long_hits.append((ticker, date))
+            
+            # Шорт-пересечение EMA20 сверху вниз
+            cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
+            confirmed_down = cross_down & (close < ema20) & (ema20 < ema50)
+            if confirmed_down.any():
+                date = confirmed_down[confirmed_down].index[0].strftime('%d.%m.%Y')
+                short_hits.append((ticker, date))
+            
         except Exception as e:
             print(f"Ошибка EMA для {ticker}: {e}")
             continue
