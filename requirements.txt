@@ -6,3 +6,4 @@ scipy
 requests
 flask
 tinkoff-investments
+aiohttp
