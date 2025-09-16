@@ -839,29 +839,23 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_signal = None
             last_date = None
     
-            # Ищем последнее пересечение
-            for i in range(1, len(recent)):
-                curr_ema20 = ema20.iloc[i]
-                curr_ema50 = ema50.iloc[i]
-                curr_close = close.iloc[i]
-                prev20 = prev_ema20.iloc[i]
-                prev50 = prev_ema50.iloc[i]
-                date = recent.index[i].strftime('%d.%m.%Y')
-    
-                # Лонг пересечение
-                if (prev20 <= prev50 and curr_ema20 > curr_ema50 and
-                    curr_close > curr_ema20 and current_close > current_ema20 and
-                    current_ema20 > current_ema50):
-                    last_signal = 'long'
-                    last_date = date
-    
-                # Шорт пересечение
-                elif (prev20 >= prev50 and curr_ema20 < curr_ema50 and
-                      curr_close < curr_ema20 and current_close < current_ema20 and
-                      current_ema20 < current_ema50):
-                    last_signal = 'short'
-                    last_date = date
-    
+            # Векторизация пересечений
+            cross_up = (prev_ema20 <= prev_ema50) & (ema20 > ema50)
+            confirmed_up = cross_up & (close > ema20) & (current_close > current_ema20) & (current_ema20 > current_ema50)
+            
+            cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
+            confirmed_down = cross_down & (close < ema20) & (current_close < current_ema20) & (current_ema20 < current_ema50)
+            
+            # Берём последнее пересечение
+            if confirmed_up.any():
+                last_signal = 'long'
+                last_date = confirmed_up[confirmed_up].index[-1].strftime('%d.%m.%Y')
+            
+            elif confirmed_down.any():
+                last_signal = 'short'
+                last_date = confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y')
+            
+            # Добавляем в списки
             if last_signal == 'long':
                 long_hits.append((ticker, last_date))
             elif last_signal == 'short':
