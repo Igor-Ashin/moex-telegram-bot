@@ -816,37 +816,57 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data(ticker, days=100)  # оставляем как есть
+            df = get_moex_data(ticker, days=100)
             if df.empty or len(df) < 100:
                 continue
-            
+    
             # Расчёт EMA
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
-            
-            # Берём последние 51 день для анализа
+    
             recent = df.tail(51)
             ema20 = recent['EMA20']
             ema50 = recent['EMA50']
             close = recent['close']
-            
+    
             prev_ema20 = ema20.shift(1)
             prev_ema50 = ema50.shift(1)
-            
-            # Лонг-пересечение EMA20 снизу вверх
-            cross_up = (prev_ema20 <= prev_ema50) & (ema20 > ema50)
-            confirmed_up = cross_up & (close > ema20) & (ema20 > ema50)
-            if confirmed_up.any():
-                date = confirmed_up[confirmed_up].index[0].strftime('%d.%m.%Y')
-                long_hits.append((ticker, date))
-            
-            # Шорт-пересечение EMA20 сверху вниз
-            cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
-            confirmed_down = cross_down & (close < ema20) & (ema20 < ema50)
-            if confirmed_down.any():
-                date = confirmed_down[confirmed_down].index[0].strftime('%d.%m.%Y')
-                short_hits.append((ticker, date))
-            
+    
+            current_close = df['close'].iloc[-1]
+            current_ema20 = df['EMA20'].iloc[-1]
+            current_ema50 = df['EMA50'].iloc[-1]
+    
+            last_signal = None
+            last_date = None
+    
+            # Ищем последнее пересечение
+            for i in range(1, len(recent)):
+                curr_ema20 = ema20.iloc[i]
+                curr_ema50 = ema50.iloc[i]
+                curr_close = close.iloc[i]
+                prev20 = prev_ema20.iloc[i]
+                prev50 = prev_ema50.iloc[i]
+                date = recent.index[i].strftime('%d.%m.%Y')
+    
+                # Лонг пересечение
+                if (prev20 <= prev50 and curr_ema20 > curr_ema50 and
+                    curr_close > curr_ema20 and current_close > current_ema20 and
+                    current_ema20 > current_ema50):
+                    last_signal = 'long'
+                    last_date = date
+    
+                # Шорт пересечение
+                elif (prev20 >= prev50 and curr_ema20 < curr_ema50 and
+                      curr_close < curr_ema20 and current_close < current_ema20 and
+                      current_ema20 < current_ema50):
+                    last_signal = 'short'
+                    last_date = date
+    
+            if last_signal == 'long':
+                long_hits.append((ticker, last_date))
+            elif last_signal == 'short':
+                short_hits.append((ticker, last_date))
+    
         except Exception as e:
             print(f"Ошибка EMA для {ticker}: {e}")
             continue
