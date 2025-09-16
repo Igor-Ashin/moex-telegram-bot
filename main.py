@@ -13,7 +13,7 @@ from scipy.signal import argrelextrema
 import asyncio
 import html
 import concurrent.futures
-from caching import figi_cache, save_figi_cache
+from caching import figi_cache, get_figi_by_ticker_with_cache
 
 
 
