@@ -5,12 +5,15 @@ import os
 from datetime import datetime
 import pandas as pd
 import requests
+import json
 
 # Конфигурация кэширования
 #CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))  # 5 минут
 #WEEKLY_CACHE_TTL = int(os.getenv("WEEKLY_CACHE_TTL", "600"))  # 10 минут
 #MAX_CACHE_ENTRIES = int(os.getenv("MAX_CACHE_ENTRIES", "1000"))
 ENABLE_CACHING = os.getenv("ENABLE_CACHING", "true").lower() == "true"
+
+CACHE_FILE = "figi_cache.json"
 
 # Глобальные кэши
 #moex_cache = {}
@@ -52,6 +55,32 @@ figi_cache = {}
             del moex_cache[key]
 
 """
+
+def load_figi_cache():
+    """Загружаем кэш из файла при старте"""
+    global figi_cache
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                figi_cache = json.load(f)
+            print("✅ figi_cache загружен из файла")
+        except Exception as e:
+            print(f"⚠️ Ошибка загрузки figi_cache: {e}")
+            figi_cache = {}
+    else:
+        print("ℹ️ Файл figi_cache.json не найден, создаём пустой кэш")
+
+
+def save_figi_cache():
+    """Сохраняем figi_cache в файл"""
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(figi_cache, f, ensure_ascii=False, indent=2)
+        print("💾 figi_cache сохранён в файл")
+    except Exception as e:
+        print(f"⚠️ Ошибка сохранения figi_cache: {e}")
+
+
 def activate_caching_if_enabled():
     ENABLE_CACHING = os.getenv("ENABLE_CACHING", "true").lower() == "true"
     print(f"🔍 ENABLE_CACHING = {ENABLE_CACHING}")
@@ -242,6 +271,15 @@ def enable_caching():
     except Exception as e:
         print(f"❌ Ошибка включения кэширования: {e}")
         return False
+
+def print_cache_stats():
+    """Выводит информацию о размере figi_cache"""
+    figi_size = sys.getsizeof(figi_cache) / 1024 / 1024
+    print(f"ℹ️ figi_cache: {len(figi_cache)} записей, {figi_size:.2f} MB")
+
+
+# Загружаем figi_cache при старте
+load_figi_cache()
 
 # Убираем автоматическое включение при импорте
 # if ENABLE_CACHING:
