@@ -1803,7 +1803,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
     app.add_handler(CommandHandler("high_volume", high_volume))
     app.add_handler(CommandHandler("rsi_top", rsi_top))
-    app.add_handler(CommandHandler("cache_debug", cache_debug))
+    #app.add_handler(CommandHandler("cache_debug", cache_debug))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     # Хендлеры с диалогами
