@@ -189,7 +189,7 @@ def get_moex_weekly_data_with_cache(ticker="SBER", weeks=80):
         return pd.DataFrame()
 """
 def get_figi_by_ticker_with_cache(ticker: str) -> str | None:
-    #Кэшированная версия get_figi_by_ticker
+    # Кэшированная версия get_figi_by_ticker
     if ticker in figi_cache:
         print(f"📋 FIGI для {ticker} взят из кэша")
         return figi_cache[ticker]
@@ -204,10 +204,12 @@ def get_figi_by_ticker_with_cache(ticker: str) -> str | None:
             for instr in instruments:
                 if instr.ticker == ticker:
                     figi_cache[ticker] = instr.figi
+                    save_figi_cache()   # ← 🟢 сохраняем кэш в файл
                     return instr.figi
         
         print(f"FIGI не найден для {ticker} в TQBR")
         figi_cache[ticker] = None
+        save_figi_cache()   # ← 🟢 сохраняем, чтобы больше не дёргать API
         return None
     except Exception as e:
         print(f"Ошибка поиска FIGI для {ticker}: {e}")
