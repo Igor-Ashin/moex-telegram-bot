@@ -14,6 +14,7 @@ import asyncio
 import html
 import concurrent.futures
 from caching import figi_cache, get_figi_by_ticker_with_cache
+from aiohttp import web
 
 
 
@@ -43,9 +44,35 @@ def set_webhook():
         print(f"Ошибка при установке webhook: {response.text}")
 
 
+# --- Функция healthcheck для UptimeRobot ---
+async def healthcheck(request):
+    return web.Response(text="OK", status=200)
 
 if __name__ == "__main__":
-    set_webhook()
+    TOKEN = os.getenv("TELEGRAM_TOKEN")
+    if not TOKEN:
+        print("❌ TELEGRAM_TOKEN не установлен.")
+        exit()
+
+    PORT = int(os.getenv("PORT", 8080))
+    WEBHOOK_PATH = f"/{TOKEN}"
+
+    # Создаём aiohttp приложение
+    aio_app = web.Application()
+
+    # POST для Telegram webhook
+    aio_app.router.add_post(WEBHOOK_PATH, app.update_queue)
+
+    # GET для UptimeRobot
+    aio_app.router.add_get("/", healthcheck)
+    aio_app.router.add_get(WEBHOOK_PATH, healthcheck)
+
+    print(f"🚀 Бот запущен на порту {PORT}, webhook {WEBHOOK_PATH}")
+    web.run_app(aio_app, port=PORT)
+
+
+#if __name__ == "__main__":
+#    set_webhook()
 
 # Telegram импорты
 try:
