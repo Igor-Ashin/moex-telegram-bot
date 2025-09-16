@@ -1070,42 +1070,27 @@ async def process_single_ticker(ticker: str):
         long_signal = None
         short_signal = None
         
-        # Проверяем пересечения за последний период
-        for i in range(1, len(recent)):
-            try:
-                prev_ema20 = recent['EMA20'].iloc[i-1]
-                prev_ema50 = recent['EMA50'].iloc[i-1]
-                curr_ema20 = recent['EMA20'].iloc[i]
-                curr_ema50 = recent['EMA50'].iloc[i]
-                curr_close = recent['close'].iloc[i]
-                
-                # Получаем дату для текущего дня
-                date = recent.index[i].strftime('%d.%m.%Y %H:%M')
-                
-                # Лонг пересечение: EMA20 пересекает EMA50 снизу вверх + подтверждение
-                if (
-                    prev_ema20 <= prev_ema50
-                    and curr_ema20 > curr_ema50
-                    and curr_close > curr_ema20
-                    and current_close > current_ema20
-                    and current_ema20 > current_ema50
-                ):
-                    long_signal = (ticker, date)
-                    break
+        # Векторная проверка пересечений EMA
+        ema20 = recent['EMA20']
+        ema50 = recent['EMA50']
+        close = recent['close']
         
-                # Шорт пересечение: EMA20 пересекает EMA50 сверху вниз + подтверждение
-                elif (
-                    prev_ema20 >= prev_ema50
-                    and curr_ema20 < curr_ema50
-                    and curr_close < curr_ema20
-                    and current_close < current_ema20
-                    and current_ema20 < current_ema50
-                ):
-                    short_signal = (ticker, date)
-                    break
-            except Exception as inner_e:
-                print(f"❌ Ошибка при анализе пересечений для {ticker}: {inner_e}")
-                continue
+        prev_ema20 = ema20.shift(1)
+        prev_ema50 = ema50.shift(1)
+        
+        # Лонг пересечение: EMA20 снизу вверх + подтверждение
+        cross_up = (prev_ema20 <= prev_ema50) & (ema20 > ema50)
+        confirmed_up = cross_up & (close > ema20) & (current_close > current_ema20) & (current_ema20 > current_ema50)
+        if confirmed_up.any():
+            date = confirmed_up[confirmed_up].index[-1].strftime('%d.%m.%Y %H:%M')
+            long_signal = (ticker, date)
+        
+        # Шорт пересечение: EMA20 сверху вниз + подтверждение
+        cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
+        confirmed_down = cross_down & (close < ema20) & (current_close < current_ema20) & (current_ema20 < current_ema50)
+        if confirmed_down.any():
+            date = confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y %H:%M')
+            short_signal = (ticker, date)
         
         return (long_signal, short_signal)
         
