@@ -80,12 +80,6 @@ WEBHOOK_URL = f"https://moex-telegram-bot-sra8.onrender.com/{WEBHOOK_PATH}"
 
 app = ApplicationBuilder().token(TOKEN).build()
 
-# Пример команды /start
-async def start(update, context):
-    await update.message.reply_text("Бот запущен!")
-
-app.add_handler(CommandHandler("start", start))
-
 
 # --- Асинхронный запуск ---
 async def main():
