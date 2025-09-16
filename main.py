@@ -50,10 +50,13 @@ async def healthcheck(request):
 
 if __name__ == "__main__":
     TOKEN = os.getenv("TELEGRAM_TOKEN")
+    # Создаем объект приложения Telegram
+    
     if not TOKEN:
         print("❌ TELEGRAM_TOKEN не установлен.")
         exit()
-
+        
+    app = ApplicationBuilder().token(TOKEN).build()
     PORT = int(os.getenv("PORT", 8080))
     WEBHOOK_PATH = f"/{TOKEN}"
 
