@@ -6,6 +6,7 @@ import requests
 import pandas as pd
 import numpy as np
 import os
+import json
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -96,9 +97,23 @@ ASK_DAYS = 1
 ASK_TICKER = 2
 ASK_DELTA_DAYS = 3
 
+FIGI_CACHE_FILE = "figi_cache.json"
 
+def load_figi_cache_from_file():
+    if os.path.exists(FIGI_CACHE_FILE):
+        with open(FIGI_CACHE_FILE, "r", encoding="utf-8") as f:
+            figi_cache = json.load(f)
+        print(f"✅ figi_cache загружен из файла: {len(figi_cache)} записей")
+        return figi_cache
+    else:
+        print("⚠️ Файл figi_cache.json не найден, возвращаем пустой словарь")
+        return {}
+
+# Загружаем figi_cache из файла
+figi_cache = load_figi_cache_from_file()
+"""
 async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отладочная команда для проверки кэша"""
+    #Отладочная команда для проверки кэша
     try:
         if 'caching' in globals():
             stats = caching.get_cache_stats()
@@ -123,6 +138,8 @@ async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка отладки: {e}")
+"""
+
 # === ФУНКЦИИ ПОЛУЧЕНИЯ ДАННЫХ ===
 
 def get_moex_data(ticker="SBER", days=120):
@@ -173,9 +190,9 @@ def get_moex_weekly_data(ticker="SBER", weeks=80):
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
-
+"""
 def get_figi_by_ticker(ticker: str) -> str | None:
-    """Получение FIGI по тикеру"""
+    #Получение FIGI по тикеру
     try:
         with Client(TINKOFF_API_TOKEN) as client:
             instruments = client.instruments.shares().instruments
@@ -187,7 +204,7 @@ def get_figi_by_ticker(ticker: str) -> str | None:
     except Exception as e:
         print(f"Ошибка поиска FIGI для {ticker}: {e}")
         return None
-
+"""
 
 
 
@@ -195,7 +212,7 @@ def get_figi_by_ticker(ticker: str) -> str | None:
 def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFrame:
     """Загружает 4H свечи по тикеру из Tinkoff Invest API"""
     try:
-        figi = get_figi_by_ticker(ticker)
+        figi = figi_cache.get(ticker)
         if figi is None:
             print(f"❌ FIGI для тикера {ticker} не найдено")
             return pd.DataFrame()
@@ -583,10 +600,10 @@ def find_sma30_crossover_week(ticker, weeks=5):
 # === TELEGRAM КОМАНДЫ ===
 
 if Update and ContextTypes:
-    
+"""    
     # Функция для получения статистики кэша
     def get_cache_stats():
-        """Возвращает статистику кэша если модуль загружен"""
+        #Возвращает статистику кэша если модуль загружен
         try:
             if 'caching' in globals():
                 return caching.get_cache_stats()
@@ -594,17 +611,16 @@ if Update and ContextTypes:
                 return {'entries': 0, 'size_mb': 0, 'status': 'disabled'}
         except:
             return {'entries': 0, 'size_mb': 0, 'status': 'error'}
-
+    """
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        # Получаем статистику кэша
-        cache_stats = get_cache_stats()
-        
-        if cache_stats.get('status') == 'disabled':
-            cache_info = "🔄 Кэширование отключено\n"
-        elif cache_stats.get('status') == 'error':
-            cache_info = "⚠️ Ошибка кэширования\n"
-        else:
-            cache_info = f"📊 Кэш: {cache_stats.get('entries', 0)} записей, {cache_stats.get('size_mb', 0)} MB\n"
+        # Закомментированный код кэша
+        # cache_stats = get_cache_stats()
+        # if cache_stats.get('status') == 'disabled':
+        #     cache_info = "🔄 Кэширование отключено\n"
+        # elif cache_stats.get('status') == 'error':
+        #     cache_info = "⚠️ Ошибка кэширования\n"
+        # else:
+        #     cache_info = f"📊 Кэш: {cache_stats.get('entries', 0)} записей, {cache_stats.get('size_mb', 0)} MB\n"
         
         text = (
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
@@ -1676,7 +1692,7 @@ if Update and ContextTypes:
         await update.message.reply_text(result_text)
 
     # В конце файла, после всех функций, но перед if __name__ == '__main__':
-    
+"""    
     # === ИНТЕГРАЦИЯ КЭШИРОВАНИЯ ===
     try:
         import caching
@@ -1691,7 +1707,7 @@ if Update and ContextTypes:
     
     except ImportError:
         print("ℹ️ Модуль кэширования не найден, работаем без кэша")
-
+"""
 
 
     # Обработчики callback
@@ -1764,8 +1780,8 @@ if Update and ContextTypes:
 
 if __name__ == '__main__':
 
-    import caching
-    caching.enable_caching()
+#    import caching
+#    caching.enable_caching()
     
     TOKEN = os.getenv("TELEGRAM_TOKEN")
     if not TOKEN:
