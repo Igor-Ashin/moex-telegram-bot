@@ -56,35 +56,51 @@ def set_webhook():
         print(f"Ошибка при установке webhook: {response.text}")
 
 
-# --- Функция healthcheck для UptimeRobot ---
+# --- Healthcheck ---
 async def healthcheck(request):
     return web.Response(text="OK", status=200)
 
+async def start_health_server():
+    app = web.Application()
+    app.router.add_get("/health", healthcheck)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8081)  # отдельный порт
+    await site.start()
+
+# --- Main ---
 if __name__ == "__main__":
     TOKEN = os.getenv("TELEGRAM_TOKEN")
-    # Создаем объект приложения Telegram
-    
     if not TOKEN:
         print("❌ TELEGRAM_TOKEN не установлен.")
         exit()
-        
-    app = ApplicationBuilder().token(TOKEN).build()
+
     PORT = int(os.getenv("PORT", 8080))
-    WEBHOOK_PATH = f"/{TOKEN}"
+    WEBHOOK_PATH = TOKEN
+    WEBHOOK_URL = f"https://moex-telegram-bot-sra8.onrender.com/{WEBHOOK_PATH}"
 
-    # Создаём aiohttp приложение
-    aio_app = web.Application()
+    # Создаем бота
+    app = ApplicationBuilder().token(TOKEN).build()
 
-    # POST для Telegram webhook
-    aio_app.router.add_post(WEBHOOK_PATH, app.update_queue)
+    # Команда /start
+    async def start(update, context):
+        await update.message.reply_text("Бот запущен!")
 
-    # GET для UptimeRobot
-    aio_app.router.add_get("/", healthcheck)
-    aio_app.router.add_get(WEBHOOK_PATH, healthcheck)
+    app.add_handler(CommandHandler("start", start))
 
-    print(f"🚀 Бот запущен на порту {PORT}, webhook {WEBHOOK_PATH}")
-    web.run_app(aio_app, port=PORT)
+    # Запуск webhook вместе с healthcheck
+    async def main():
+        # Старт healthcheck сервера параллельно
+        asyncio.create_task(start_health_server())
+        # Запуск бота с webhook
+        await app.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            url_path=WEBHOOK_PATH,
+            webhook_url=WEBHOOK_URL
+        )
 
+    asyncio.run(main())
 
 #if __name__ == "__main__":
 #    set_webhook()
