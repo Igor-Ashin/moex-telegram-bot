@@ -960,7 +960,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         print(f"❌ Ошибка отправки прогресса: {progress_e}")
                 
                 # Небольшая задержка между запросами + принудительный сброс буфера
-                await asyncio.sleep(0.8)  # Увеличиваем задержку для API Tinkoff
+                await asyncio.sleep(0.3)  # Увеличиваем задержку для API Tinkoff
                 sys.stdout.flush()
                 
             except asyncio.TimeoutError:
