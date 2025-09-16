@@ -68,7 +68,7 @@ async def start_health_server():
     site = web.TCPSite(runner, "0.0.0.0", 8081)
     await site.start()
 
-# --- Main ---
+# --- Telegram Bot ---
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 if not TOKEN:
     print("❌ TELEGRAM_TOKEN не установлен.")
@@ -78,26 +78,37 @@ PORT = int(os.getenv("PORT", 8080))
 WEBHOOK_PATH = TOKEN
 WEBHOOK_URL = f"https://moex-telegram-bot-sra8.onrender.com/{WEBHOOK_PATH}"
 
-# Создаем бота
 app = ApplicationBuilder().token(TOKEN).build()
 
-# Команда /start
+# Пример команды /start
 async def start(update, context):
     await update.message.reply_text("Бот запущен!")
 
 app.add_handler(CommandHandler("start", start))
 
-# Старт healthcheck сервера параллельно
-loop = asyncio.get_event_loop()
-loop.create_task(start_health_server())
 
-# Запуск webhook (не через asyncio.run)
-app.run_webhook(
-    listen="0.0.0.0",
-    port=PORT,
-    url_path=WEBHOOK_PATH,
-    webhook_url=WEBHOOK_URL
-)
+# --- Асинхронный запуск ---
+async def main():
+    # Запускаем healthcheck сервер параллельно
+    asyncio.create_task(start_health_server())
+
+    # Запускаем телеграм бота вручную
+    await app.initialize()
+    await app.start()
+    await app.start_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=WEBHOOK_PATH,
+        webhook_url=WEBHOOK_URL
+    )
+
+    print(f"🚀 Бот запущен по адресу {WEBHOOK_URL}")
+
+    # Ожидаем завершения (работаем до SIGTERM на Render)
+    await asyncio.Event().wait()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 #if __name__ == "__main__":
 #    set_webhook()
 
