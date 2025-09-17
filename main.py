@@ -816,7 +816,7 @@ async def cross_ema200(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for ticker in sum(SECTORS.values(), []):
         try:
-            df = get_moex_data(ticker, days=250)
+            df = get_moex_data(ticker, days=350)
             if df.empty or len(df) < 200:
                 continue
 
