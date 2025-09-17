@@ -1363,7 +1363,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
 # RSI TOP с Стохастиком
 async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Команда для показа топ 10 перекупленных и топ 10 перепроданных акций по RSI с добавлением Стохастика
+    Команда для показа топ перекупленных и топ перепроданных акций по RSI с добавлением Стохастика
     """
     await update.message.reply_text("🔍 Анализирую RSI и Стохастик всех акций. Это может занять некоторое время...")
     
@@ -1423,14 +1423,14 @@ async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     oversold_stocks.sort(key=lambda x: x[1])
     
     # Формирование сообщения
-    msg = f"📊 RSI и Стохастик анализ на {datetime.now().strftime('%d.%m.%Y %H:%M')}:\n\n"
+    msg = f"📊 RSI и Стохастик на {datetime.now().strftime('%d.%m.%Y')}:\n\n"
     
     # 🔴 Перекупленные
     if overbought_stocks:
-        msg += "🔴 Топ 10 перекупленных акций (RSI ≥ 70):\n<pre>\n"
+        msg += "🔴 Топ перекупленных акций (RSI ≥ 70):\n<pre>\n"
         msg += f"{'Тикер':<6} {'RSI':<4} {'STOCH':<6} {'Цена':<8} {'Изм %':<7} {'Отн.об %':<8}\n"
         msg += f"{'─'*6} {'─'*4} {'─'*6} {'─'*8} {'─'*7} {'─'*8}\n"
-        for ticker, rsi_val, stoch_val, price, price_change_pct, rel_volume in overbought_stocks[:10]:
+        for ticker, rsi_val, stoch_val, price, price_change_pct, rel_volume in overbought_stocks[:30]:
             msg += f"{ticker:<6} {rsi_val:4.0f} {stoch_val:6.0f} {price:8.1f} {price_change_pct:+6.1f}% {rel_volume:7.0f}%\n"
         msg += "</pre>\n\n"
     else:
@@ -1438,10 +1438,10 @@ async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 🟢 Перепроданные
     if oversold_stocks:
-        msg += "🟢 Топ 10 перепроданных акций (RSI ≤ 30):\n<pre>\n"
+        msg += "🟢 Топ перепроданных акций (RSI ≤ 30):\n<pre>\n"
         msg += f"{'Тикер':<6} {'RSI':<4} {'STOCH':<6} {'Цена':<8} {'Изм %':<7} {'Отн.об %':<8}\n"
         msg += f"{'─'*6} {'─'*4} {'─'*6} {'─'*8} {'─'*7} {'─'*8}\n"
-        for ticker, rsi_val, stoch_val, price, price_change_pct, rel_volume in oversold_stocks[:10]:
+        for ticker, rsi_val, stoch_val, price, price_change_pct, rel_volume in oversold_stocks[:30]:
             msg += f"{ticker:<6} {rsi_val:4.0f} {stoch_val:6.0f} {price:8.1f} {price_change_pct:+6.1f}% {rel_volume:7.0f}%\n"
         msg += "</pre>\n\n"
     else:
