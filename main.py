@@ -1360,106 +1360,100 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(f"❌ Ошибка при анализе {ticker}: {str(e)}")
         
 
-# RSI TOP
+# RSI TOP с Стохастиком
 async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Команда для показа топ 10 перекупленных и топ 10 перепроданных акций по RSI
+    Команда для показа топ 10 перекупленных и топ 10 перепроданных акций по RSI с добавлением Стохастика
     """
-    await update.message.reply_text("🔍 Анализирую RSI всех акций. Это может занять некоторое время...")
+    await update.message.reply_text("🔍 Анализирую RSI и Стохастик всех акций. Это может занять некоторое время...")
     
     overbought_stocks = []  # RSI > 70
     oversold_stocks = []    # RSI < 30
     
+    # Функция расчета Стохастика %K
+    def stochastic_k(df, k_period=14):
+        low_min = df['low'].rolling(k_period).min()
+        high_max = df['high'].rolling(k_period).max()
+        stoch_k = 100 * (df['close'] - low_min) / (high_max - low_min)
+        return stoch_k
+    
     # Проходим по всем тикерам
     for ticker in sum(SECTORS.values(), []):
         try:
-            # Получаем данные за последние 100 дней (с запасом для RSI)
             df = get_moex_data(ticker, days=100)
-            if df.empty or len(df) < 15:  # Минимум 15 дней для корректного RSI
+            if df.empty or len(df) < 15:
                 continue
             
-            # 💰 Среднедневной оборот за фиксированные 10 дней (для фильтра)
-            filter_turnover_series = df['volume'].iloc[-10:] * df['close'].iloc[-10:]
-            filter_avg_turnover = filter_turnover_series.mean()
-            
-            # ❌ Фильтр по минимальному обороту: 50 млн руб за последние 10 дней
+            # 💰 Среднедневной оборот за последние 10 дней
+            filter_avg_turnover = (df['volume'].iloc[-10:] * df['close'].iloc[-10:]).mean()
             if filter_avg_turnover < 50_000_000:
                 continue
             
-            # Вычисляем RSI
+            # RSI и Стохастик
             rsi = compute_rsi(df['close'], window=14)
-            if rsi.empty:
+            stoch = stochastic_k(df, k_period=14)
+            
+            if rsi.empty or stoch.empty:
                 continue
-                
-            # Берем последнее значение RSI
+            
             current_rsi = rsi.iloc[-1]
-            if pd.isna(current_rsi):
+            current_stoch = stoch.iloc[-1]
+            if pd.isna(current_rsi) or pd.isna(current_stoch):
                 continue
-                
-            # Текущая цена и изменение за день
+            
             current_price = df['close'].iloc[-1]
             prev_price = df['close'].iloc[-2] if len(df) >= 2 else current_price
-            price_change = current_price - prev_price
-            price_change_pct = (price_change / prev_price * 100) if prev_price != 0 else 0
+            price_change_pct = (current_price - prev_price) / prev_price * 100 if prev_price != 0 else 0
             
-            # Относительный объем (текущий объем к среднему за 10 дней)
             current_volume = df['volume'].iloc[-1]
             avg_volume = df['volume'].iloc[-10:].mean()
-            relative_volume_pct = (current_volume / avg_volume * 100) if avg_volume != 0 else 100
+            relative_volume_pct = current_volume / avg_volume * 100 if avg_volume != 0 else 100
             
-            # Классификация по RSI
             if current_rsi >= 70:
-                overbought_stocks.append((ticker, current_rsi, current_price, price_change_pct, relative_volume_pct))
+                overbought_stocks.append((ticker, current_rsi, current_stoch, current_price, price_change_pct, relative_volume_pct))
             elif current_rsi <= 30:
-                oversold_stocks.append((ticker, current_rsi, current_price, price_change_pct, relative_volume_pct))
+                oversold_stocks.append((ticker, current_rsi, current_stoch, current_price, price_change_pct, relative_volume_pct))
                 
         except Exception as e:
             logger.error(f"Ошибка при анализе RSI для {ticker}: {e}")
             continue
     
-    # Сортируем списки
-    overbought_stocks.sort(key=lambda x: x[1], reverse=True)  # По убыванию RSI
-    oversold_stocks.sort(key=lambda x: x[1])                 # По возрастанию RSI
+    # Сортировка
+    overbought_stocks.sort(key=lambda x: x[1], reverse=True)
+    oversold_stocks.sort(key=lambda x: x[1])
     
-    # Формируем сообщение
-    msg = f"📊 RSI анализ на {datetime.now().strftime('%d.%m.%Y %H:%M')}:\n\n"
+    # Формирование сообщения
+    msg = f"📊 RSI и Стохастик анализ на {datetime.now().strftime('%d.%m.%Y %H:%M')}:\n\n"
     
-    # 🔴 Перекупленные акции (RSI >= 70)
+    # 🔴 Перекупленные
     if overbought_stocks:
-        msg += "🔴 Топ 10 перекупленных акций (RSI ≥ 70):\n"
-        msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Изм %':<7}  {'Отн.об %':<8}\n"
-        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 7}  {'─' * 8}\n"
-        
-        for ticker, rsi_val, price, price_change_pct, rel_volume in overbought_stocks[:10]:
-            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {price_change_pct:+6.1f}%  {rel_volume:7.0f}%\n"
+        msg += "🔴 Топ 10 перекупленных акций (RSI ≥ 70):\n<pre>\n"
+        msg += f"{'Тикер':<6} {'RSI':<4} {'STOCH':<6} {'Цена':<8} {'Изм %':<7} {'Отн.об %':<8}\n"
+        msg += f"{'─'*6} {'─'*4} {'─'*6} {'─'*8} {'─'*7} {'─'*8}\n"
+        for ticker, rsi_val, stoch_val, price, price_change_pct, rel_volume in overbought_stocks[:10]:
+            msg += f"{ticker:<6} {rsi_val:4.0f} {stoch_val:6.0f} {price:8.1f} {price_change_pct:+6.1f}% {rel_volume:7.0f}%\n"
         msg += "</pre>\n\n"
     else:
-        msg += "🔴 Перекупленных акций (RSI ≥ 70) не найдено\n\n"
+        msg += "🔴 Перекупленных акций не найдено\n\n"
     
-    # 🟢 Перепроданные акции (RSI <= 30)
+    # 🟢 Перепроданные
     if oversold_stocks:
-        msg += "🟢 Топ 10 перепроданных акций (RSI ≤ 30):\n"
-        msg += "<pre>\n"
-        msg += f"{'Тикер':<6}  {'RSI':<4}  {'Цена':<8}  {'Изм %':<7}  {'Отн.об %':<8}\n"
-        msg += f"{'─' * 6}  {'─' * 4}  {'─' * 8}  {'─' * 7}  {'─' * 8}\n"
-        
-        for ticker, rsi_val, price, price_change_pct, rel_volume in oversold_stocks[:10]:
-            msg += f"{ticker:<6}  {rsi_val:4.0f}  {price:8.1f}  {price_change_pct:+6.1f}%  {rel_volume:7.0f}%\n"
+        msg += "🟢 Топ 10 перепроданных акций (RSI ≤ 30):\n<pre>\n"
+        msg += f"{'Тикер':<6} {'RSI':<4} {'STOCH':<6} {'Цена':<8} {'Изм %':<7} {'Отн.об %':<8}\n"
+        msg += f"{'─'*6} {'─'*4} {'─'*6} {'─'*8} {'─'*7} {'─'*8}\n"
+        for ticker, rsi_val, stoch_val, price, price_change_pct, rel_volume in oversold_stocks[:10]:
+            msg += f"{ticker:<6} {rsi_val:4.0f} {stoch_val:6.0f} {price:8.1f} {price_change_pct:+6.1f}% {rel_volume:7.0f}%\n"
         msg += "</pre>\n\n"
     else:
-        msg += "🟢 Перепроданных акций (RSI ≤ 30) не найдено\n\n"
+        msg += "🟢 Перепроданных акций не найдено\n\n"
     
     # Статистика
     total_analyzed = len(overbought_stocks) + len(oversold_stocks)
-    msg += f"📈 Статистика:\n"
-    msg += f"• Всего акций в зонах экстремума: {total_analyzed}\n"
-    msg += f"• Перекупленных: {len(overbought_stocks)}\n"
-    msg += f"• Перепроданных: {len(oversold_stocks)}\n"
+    msg += f"📈 Статистика:\n• Всего акций в зонах экстремума: {total_analyzed}\n"
+    msg += f"• Перекупленных: {len(overbought_stocks)}\n• Перепроданных: {len(oversold_stocks)}\n"
     msg += f"• Фильтр по обороту: ≥50 млн ₽/день"
     
     await update.message.reply_text(msg, parse_mode="HTML")
-
 
 
 # === Новая команда: long_moneyflow ===
