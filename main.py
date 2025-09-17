@@ -630,6 +630,7 @@ if Update and ContextTypes:
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
             "/cross_ema20x50_4h — акции с пересечением EMA 20x50 на 4H\n"
+            "/cross_ema200 — акции с пересечением цены и EMA200 на 1D\n"
             "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
             "/stan_recent_d_short — акции с шорт пересечением SMA30 на 1D\n"
             "/stan_recent_week — акции с лонг пересечением SMA30 на 1W\n"
@@ -808,6 +809,87 @@ if Update and ContextTypes:
         
         await update.message.reply_text(msg, parse_mode="HTML")
 
+async def cross_ema200(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу пересечения цены и EMA200 за последние 200 дней...")
+    long_hits, short_hits = [], []
+
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            df = get_moex_data(ticker, days=250)  # берём запас чуть больше 200
+            if df.empty or len(df) < 200:
+                continue
+
+            # EMA200
+            df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
+            recent = df.tail(201)
+
+            close = recent['close']
+            ema200 = recent['EMA200']
+            prev_close = close.shift(1)
+            prev_ema200 = ema200.shift(1)
+
+            current_close = df['close'].iloc[-1]
+            current_ema200 = df['EMA200'].iloc[-1]
+
+            last_signal = None
+            last_date = None
+
+            # Векторизация пересечений
+            cross_up = (prev_close <= prev_ema200) & (close > ema200)
+            confirmed_up = cross_up & (current_close > current_ema200)
+
+            cross_down = (prev_close >= prev_ema200) & (close < ema200)
+            confirmed_down = cross_down & (current_close < current_ema200)
+
+            # Последний сигнал
+            if confirmed_up.any():
+                last_signal = "long"
+                last_date = confirmed_up[confirmed_up].index[-1].strftime("%d.%m.%Y")
+
+            elif confirmed_down.any():
+                last_signal = "short"
+                last_date = confirmed_down[confirmed_down].index[-1].strftime("%d.%m.%Y")
+
+            # Заполняем результаты
+            if last_signal == "long":
+                long_hits.append((ticker, last_date))
+            elif last_signal == "short":
+                short_hits.append((ticker, last_date))
+
+        except Exception as e:
+            print(f"Ошибка EMA200 для {ticker}: {e}")
+            continue
+
+    # Сортировка по дате (новые выше)
+    long_hits.sort(key=lambda x: datetime.strptime(x[1], "%d.%m.%Y"), reverse=True)
+    short_hits.sort(key=lambda x: datetime.strptime(x[1], "%d.%m.%Y"), reverse=True)
+
+    # Формируем сообщение
+    msg = ""
+    if long_hits:
+        msg += f"🟢 *Лонг пересечение цены и EMA200, всего: {len(long_hits)}:*\n"
+        msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
+    else:
+        msg += "🟢 *Лонг сигналов не найдено*\n\n"
+
+    if short_hits:
+        msg += f"🔴 *Шорт пересечение цены и EMA200, всего: {len(short_hits)}:*\n"
+        msg += "\n".join(f"{t} {d}" for t, d in short_hits) + "\n\n"
+    else:
+        msg += "🔴 *Шорт сигналов не найдено*\n\n"
+
+    # Итоговый список
+    if long_hits or short_hits:
+        tickers_summary = []
+        if long_hits:
+            long_tickers = ", ".join(t for t, _ in long_hits)
+            tickers_summary.append(f"*Лонг:* {long_tickers}")
+        if short_hits:
+            short_tickers = ", ".join(t for t, _ in short_hits)
+            tickers_summary.append(f"\n*Шорт:* {short_tickers}")
+        msg += "\n" + "\n".join(tickers_summary)
+
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 50 дней...")
@@ -1778,6 +1860,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("chart_hv", chart_hv))
     app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
     app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
+    app.add_handler(CommandHandler("cross_ema200", cross_ema200))
     app.add_handler(CommandHandler("stan", stan))
     app.add_handler(CommandHandler("stan_recent", stan_recent))
     app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
