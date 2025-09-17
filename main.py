@@ -637,7 +637,7 @@ if Update and ContextTypes:
             "/moneyflow - Топ по росту и оттоку денежного потока (Money A/D)\n"
             "/high_volume - Акции с повышенным объемом\n"
             "/delta — расчет дельты денежного потока для конкретной акции\n"
-            "/rsi_top — Топ 10 перекупленных и перепроданных акций по RSI\n"
+            "/rsi_top — Топ перекупленных и перепроданных акций по RSI и Стохастику\n"
         )
         await update.message.reply_text(text)
 
