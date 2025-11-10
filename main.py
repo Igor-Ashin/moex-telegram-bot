@@ -630,6 +630,7 @@ if Update and ContextTypes:
             "/stan — анализ акции по методу Стэна Вайнштейна\n"
             "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
             "/cross_ema20x50_4h — акции с пересечением EMA 20x50 на 4H\n"
+            "/cross_ema9x50 — акции с пересечением EMA 20x50 на 1D\n"
             "/cross_ema200 — акции с пересечением цены и EMA200 на 1D\n"
             "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
             "/stan_recent_d_short — акции с шорт пересечением SMA30 на 1D\n"
@@ -978,6 +979,96 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "\n" + "\n".join(tickers_summary)
 
     await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+async def cross_ema9x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу пересечения EMA9 и EMA50 за последние 50 дней...")
+    long_hits, short_hits = [], []
+    today = datetime.today().date()
+    
+    for ticker in sum(SECTORS.values(), []):
+        try:
+            df = get_moex_data(ticker, days=100)
+            if df.empty or len(df) < 100:
+                continue
+    
+            # Расчёт EMA
+            df['EMA9'] = df['close'].ewm(span=9, adjust=False).mean()
+            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+    
+            recent = df.tail(51)
+            ema9 = recent['EMA9']
+            ema50 = recent['EMA50']
+            close = recent['close']
+    
+            prev_ema9 = ema9.shift(1)
+            prev_ema50 = ema50.shift(1)
+    
+            current_close = df['close'].iloc[-1]
+            current_ema9 = df['EMA9'].iloc[-1]
+            current_ema50 = df['EMA50'].iloc[-1]
+    
+            last_signal = None
+            last_date = None
+    
+            # Векторизация пересечений
+            cross_up = (prev_ema9 <= prev_ema50) & (ema9 > ema50)
+            confirmed_up = cross_up & (close > ema9) & (current_close > current_ema9) & (current_ema9 > current_ema50)
+            
+            cross_down = (prev_ema9 >= prev_ema50) & (ema9 < ema50)
+            confirmed_down = cross_down & (close < ema9) & (current_close < current_ema9) & (current_ema9 < current_ema50)
+            
+            # Берём последнее пересечение
+            if confirmed_up.any():
+                last_signal = 'long'
+                last_date = confirmed_up[confirmed_up].index[-1].strftime('%d.%m.%Y')
+            
+            elif confirmed_down.any():
+                last_signal = 'short'
+                last_date = confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y')
+            
+            # Добавляем в списки
+            if last_signal == 'long':
+                long_hits.append((ticker, last_date))
+            elif last_signal == 'short':
+                short_hits.append((ticker, last_date))
+    
+        except Exception as e:
+            print(f"Ошибка EMA для {ticker}: {e}")
+            continue
+    
+    # Сортировка по дате (новые вверх)
+    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+    short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+    
+    # Формируем сообщение
+    msg = ""
+    if long_hits:
+        msg += f"🟢 *Лонг пересечение EMA9×50 за последние 50 дней, всего: {len(long_hits)}:*\n"
+        msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
+    else:
+        msg += "🟢 *Лонг сигналов не найдено за последние 50 дней*\n\n"
+        
+    if short_hits:
+        msg += f"🔴 *Шорт пересечение EMA9×50 за последние 50 дней, всего: {len(short_hits)}:*\n"
+        msg += "\n".join(f"{t} {d}" for t, d in short_hits)+ "\n\n"
+    else:
+        msg += "🔴 *Шорт сигналов не найдено за последние 50 дней*\n\n"
+    #msg += "\n"   
+    # Добавляем итоговый список тикеров внизу
+    if long_hits or short_hits:
+        tickers_summary = []
+        if long_hits:
+            long_tickers = ", ".join(t for t, _ in long_hits)
+            tickers_summary.append(f"*Лонг:* {long_tickers}")
+        if short_hits:
+            short_tickers = ", ".join(t for t, _ in short_hits)
+            tickers_summary.append(f"\n*Шорт:* {short_tickers}")
+        msg += "\n" + "\n".join(tickers_summary)
+
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
 
 
 async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1855,6 +1946,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("chart_hv", chart_hv))
     app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
     app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
+    app.add_handler(CommandHandler("cross_ema9x50", cross_ema9x50))
     app.add_handler(CommandHandler("cross_ema200", cross_ema200))
     app.add_handler(CommandHandler("stan", stan))
     app.add_handler(CommandHandler("stan_recent", stan_recent))
