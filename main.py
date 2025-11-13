@@ -1306,7 +1306,7 @@ async def process_single_ticker(ticker: str):
         cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
         confirmed_down = cross_down & (close < ema20)
         if confirmed_down.any():
-            date = confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y %H:%М')
+            date = confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y %H:%M')
             if current_close < current_ema20 < current_ema50:
                 emoji = "🔴"
             elif current_close > current_ema20:
