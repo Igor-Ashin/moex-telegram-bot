@@ -996,7 +996,7 @@ async def cross_ema9x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df['EMA9'] = df['close'].ewm(span=9, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
 
-            recent = df.tail(51)
+            recent = df.tail(51)  # последние 50 дней + предыдущий бар для сдвига
             ema9 = recent['EMA9']
             ema50 = recent['EMA50']
             close = recent['close']
@@ -1008,34 +1008,55 @@ async def cross_ema9x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current_ema9 = df['EMA9'].iloc[-1]
             current_ema50 = df['EMA50'].iloc[-1]
 
-            # Векторизация пересечений
+            # Векторизация пересечений на recent
             cross_up = (prev_ema9 <= prev_ema50) & (ema9 > ema50)
             cross_down = (prev_ema9 >= prev_ema50) & (ema9 < ema50)
 
-            # Проверяем последнее пересечение
-            if cross_up.any():
-                last_signal = 'long'
-                last_date = cross_up[cross_up].index[-1].strftime('%d.%m.%Y')
+            # Получаем последние даты пересечений, если они есть
+            last_up_idx = cross_up[cross_up].index[-1] if cross_up.any() else None
+            last_down_idx = cross_down[cross_down].index[-1] if cross_down.any() else None
 
-                # Классификация после пересечения
-                if (current_close > current_ema9) and (current_ema9 > current_ema50):
-                    mark = "🟢"  # чистый ап-тренд
+            # Выбираем, какое пересечение было ПОСЛЕДНИМ
+            chosen_signal = None
+            chosen_date = None
+
+            if last_up_idx is not None and last_down_idx is not None:
+                # сравниваем даты
+                if last_up_idx > last_down_idx:
+                    chosen_signal = 'long'
+                    chosen_date = last_up_idx
                 else:
-                    mark = "🟠"  # пересечение было, но цена не подтверждает
+                    chosen_signal = 'short'
+                    chosen_date = last_down_idx
+            elif last_up_idx is not None:
+                chosen_signal = 'long'
+                chosen_date = last_up_idx
+            elif last_down_idx is not None:
+                chosen_signal = 'short'
+                chosen_date = last_down_idx
+            else:
+                chosen_signal = None
 
-                long_hits.append((f"{mark} {ticker}", last_date))
+            # Если пересечение найдено — классифицируем по текущему положению цены/EMA
+            if chosen_signal is not None:
+                last_date_str = chosen_date.strftime('%d.%m.%Y')
 
-            elif cross_down.any():
-                last_signal = 'short'
-                last_date = cross_down[cross_down].index[-1].strftime('%d.%m.%Y')
+                if chosen_signal == 'long':
+                    # метка: 🟢 если цена > EMA9 и EMA9 > EMA50
+                    if (current_close > current_ema9) and (current_ema9 > current_ema50):
+                        mark = "🟢"
+                    else:
+                        # EMA9 выше EMA50 (после пересечения), но цена не выше EMA9
+                        # либо EMA9 уже опустилась ниже EMA50 — всё равно помечаем как 🟠 в остальных случаях
+                        mark = "🟠"
+                    long_hits.append((f"{mark} {ticker}", last_date_str))
 
-                # Классификация после пересечения
-                if (current_close < current_ema9) and (current_ema9 < current_ema50):
-                    mark = "🔴"  # чистый даун-тренд
-                else:
-                    mark = "🟠"  # пересечение было, но цена не подтверждает
-
-                short_hits.append((f"{mark} {ticker}", last_date))
+                elif chosen_signal == 'short':
+                    if (current_close < current_ema9) and (current_ema9 < current_ema50):
+                        mark = "🔴"
+                    else:
+                        mark = "🟠"
+                    short_hits.append((f"{mark} {ticker}", last_date_str))
 
         except Exception as e:
             print(f"Ошибка EMA для {ticker}: {e}")
@@ -1071,6 +1092,7 @@ async def cross_ema9x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "\n" + "\n".join(tickers_summary)
 
     await update.message.reply_text(msg, parse_mode="Markdown")
+
 
 
 
