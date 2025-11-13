@@ -1222,12 +1222,13 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if long_hits or short_hits:
             tickers_summary = []
             if long_hits:
-                long_tickers = ", ".join(t for t, _ in long_hits)
+                long_tickers = ", ".join(t.split()[-1] for t, _ in long_hits)  # без эмодзи
                 tickers_summary.append(f"*Лонг:* {long_tickers}")
             if short_hits:
-                short_tickers = ", ".join(t for t, _ in short_hits)
+                short_tickers = ", ".join(t.split()[-1] for t, _ in short_hits)  # без эмодзи
                 tickers_summary.append(f"\n*Шорт:* {short_tickers}")
             msg += "\n" + "\n".join(tickers_summary)
+
         
         # Отправляем результат
         await update.message.reply_text(msg, parse_mode="Markdown")
