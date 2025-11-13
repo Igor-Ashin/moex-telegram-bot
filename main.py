@@ -1247,19 +1247,22 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_single_ticker(ticker: str):
     """
-    Обрабатывает один тикер и возвращает найденные сигналы EMA20x50 (4H)
-    с визуальной пометкой силы тренда.
+    Обрабатывает один тикер и возвращает найденные сигналы с цветными статусами для вывода
     """
     try:
-        # Получаем данные по 4H таймфрейму
+        # Получаем данные
         df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25)
         print(f"📊 Данные получены для {ticker}: {len(df) if not df.empty else 0} свечей")
         
-        if df.empty or len(df) < 50:
-            print(f"❌ Недостаточно данных для {ticker}")
+        if df.empty:
+            print(f"❌ Пустые данные для {ticker}")
             return None
-
-        # Расчёт EMA
+            
+        if len(df) < 50:
+            print(f"❌ Недостаточно данных для {ticker}: {len(df)} свечей")
+            return None
+        
+        # Рассчитываем EMA
         def calculate_ema(df):
             df_copy = df.copy()
             df_copy['EMA20'] = df_copy['close'].ewm(span=20, adjust=False).mean()
@@ -1267,53 +1270,52 @@ async def process_single_ticker(ticker: str):
             return df_copy
         
         df = await asyncio.to_thread(calculate_ema, df)
-
-        # Анализ пересечений
         recent = df.tail(26)
-        ema20 = recent['EMA20']
-        ema50 = recent['EMA50']
-        close = recent['close']
-        prev_ema20 = ema20.shift(1)
-        prev_ema50 = ema50.shift(1)
-
+        
+        # Текущие значения
         current_close = df['close'].iloc[-1]
         current_ema20 = df['EMA20'].iloc[-1]
         current_ema50 = df['EMA50'].iloc[-1]
+        
+        ema20 = recent['EMA20']
+        ema50 = recent['EMA50']
+        close = recent['close']
+        
+        prev_ema20 = ema20.shift(1)
+        prev_ema50 = ema50.shift(1)
 
         long_signal = None
         short_signal = None
-
-        # --- Векторизация пересечений ---
+        
+        # Лонг пересечение
         cross_up = (prev_ema20 <= prev_ema50) & (ema20 > ema50)
+        confirmed_up = cross_up & (close > ema20)
+        if confirmed_up.any():
+            date = confirmed_up[confirmed_up].index[-1].strftime('%d.%m.%Y %H:%M')
+            # Проверяем подтверждение тренда
+            if current_close > current_ema20 > current_ema50:
+                emoji = "🟢"
+            elif current_close < current_ema20:
+                emoji = "🟠"
+            else:
+                emoji = "🟢"
+            long_signal = (f"{emoji} {ticker}", date)
+        
+        # Шорт пересечение
         cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
-
-        # --- Проверяем последнее пересечение ---
-        if cross_up.any():
-            last_date = cross_up[cross_up].index[-1].strftime('%d.%m.%Y %H:%M')
-
-            # 🟢 EMA20 > EMA50 и цена > EMA20 → идеальный ап-тренд
-            if current_close > current_ema20 and current_ema20 > current_ema50:
-                marker = "🟢"
-            # 🟠 пересечение подтверждено, но цена под EMA20
+        confirmed_down = cross_down & (close < ema20)
+        if confirmed_down.any():
+            date = confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y %H:%М')
+            if current_close < current_ema20 < current_ema50:
+                emoji = "🔴"
+            elif current_close > current_ema20:
+                emoji = "🟠"
             else:
-                marker = "🟠"
-
-            long_signal = (f"{marker} {ticker}", last_date)
-
-        elif cross_down.any():
-            last_date = cross_down[cross_down].index[-1].strftime('%d.%m.%Y %H:%M')
-
-            # 🔴 EMA20 < EMA50 и цена < EMA20 → уверенный даун-тренд
-            if current_close < current_ema20 and current_ema20 < current_ema50:
-                marker = "🔴"
-            # 🟠 пересечение, но цена выше EMA20
-            else:
-                marker = "🟠"
-
-            short_signal = (f"{marker} {ticker}", last_date)
-
+                emoji = "🔴"
+            short_signal = (f"{emoji} {ticker}", date)
+        
         return (long_signal, short_signal)
-
+        
     except Exception as e:
         print(f"❌ Ошибка обработки тикера {ticker}: {e}")
         return None
