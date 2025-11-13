@@ -1251,75 +1251,81 @@ async def process_single_ticker(ticker: str):
     Обрабатывает один тикер и возвращает найденные сигналы с цветными статусами для вывода
     """
     try:
-        # Получаем данные
-        df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 25)
-        print(f"📊 Данные получены для {ticker}: {len(df) if not df.empty else 0} свечей")
-        
-        if df.empty:
-            print(f"❌ Пустые данные для {ticker}")
+        # Получаем данные (async с переносом в поток для синхронной функции)
+        df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 50)
+        if df.empty or len(df) < 50:
+            print(f"❌ Недостаточно данных для {ticker}: {len(df) if not df.empty else 0}")
             return None
-            
-        if len(df) < 50:
-            print(f"❌ Недостаточно данных для {ticker}: {len(df)} свечей")
-            return None
-        
-        # Рассчитываем EMA
-        def calculate_ema(df):
-            df_copy = df.copy()
-            df_copy['EMA20'] = df_copy['close'].ewm(span=20, adjust=False).mean()
-            df_copy['EMA50'] = df_copy['close'].ewm(span=50, adjust=False).mean()
-            return df_copy
-        
-        df = await asyncio.to_thread(calculate_ema, df)
+
+        # Рассчитываем EMA20 и EMA50
+        df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+        df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+
+        # Для поиска последних пересечений берем последние 26 свечей
         recent = df.tail(26)
-        
-        # Текущие значения
-        current_close = df['close'].iloc[-1]
-        current_ema20 = df['EMA20'].iloc[-1]
-        current_ema50 = df['EMA50'].iloc[-1]
-        
         ema20 = recent['EMA20']
         ema50 = recent['EMA50']
         close = recent['close']
-        
+
         prev_ema20 = ema20.shift(1)
         prev_ema50 = ema50.shift(1)
 
-        long_signal = None
-        short_signal = None
-        
-        # Лонг пересечение
+        # Определяем пересечения EMA
         cross_up = (prev_ema20 <= prev_ema50) & (ema20 > ema50)
-        confirmed_up = cross_up & (close > ema20)
-        if confirmed_up.any():
-            date = confirmed_up[confirmed_up].index[-1].strftime('%d.%m.%Y %H:%M')
-            # Проверяем подтверждение тренда
+        cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
+
+        # Последние пересечения
+        last_up_idx = cross_up[cross_up].index[-1] if cross_up.any() else None
+        last_down_idx = cross_down[cross_down].index[-1] if cross_down.any() else None
+
+        chosen_signal = None
+        chosen_date = None
+
+        if last_up_idx is not None and last_down_idx is not None:
+            if last_up_idx > last_down_idx:
+                chosen_signal = 'long'
+                chosen_date = last_up_idx
+            else:
+                chosen_signal = 'short'
+                chosen_date = last_down_idx
+        elif last_up_idx is not None:
+            chosen_signal = 'long'
+            chosen_date = last_up_idx
+        elif last_down_idx is not None:
+            chosen_signal = 'short'
+            chosen_date = last_down_idx
+
+        if chosen_signal is None:
+            return None
+
+        # Текущие значения для окраски эмодзи
+        current_close = df['close'].iloc[-1]
+        current_ema20 = df['EMA20'].iloc[-1]
+        current_ema50 = df['EMA50'].iloc[-1]
+
+        if chosen_signal == 'long':
             if current_close > current_ema20 > current_ema50:
                 emoji = "🟢"
             elif current_close < current_ema20:
                 emoji = "🟠"
             else:
                 emoji = "🟢"
-            long_signal = (f"{emoji} {ticker}", date)
-        
-        # Шорт пересечение
-        cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
-        confirmed_down = cross_down & (close < ema20)
-        if confirmed_down.any():
-            date = confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y %H:%M')
+        else:  # short
             if current_close < current_ema20 < current_ema50:
                 emoji = "🔴"
             elif current_close > current_ema20:
                 emoji = "🟠"
             else:
                 emoji = "🔴"
-            short_signal = (f"{emoji} {ticker}", date)
-        
-        return (long_signal, short_signal)
-        
+
+        signal = (f"{emoji} {ticker}", chosen_date.strftime('%d.%m.%Y %H:%M'))
+        return (signal if chosen_signal == 'long' else None,
+                signal if chosen_signal == 'short' else None)
+
     except Exception as e:
         print(f"❌ Ошибка обработки тикера {ticker}: {e}")
         return None
+
 
 
 
