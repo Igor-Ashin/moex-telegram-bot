@@ -19,7 +19,7 @@ import concurrent.futures
 
 
 # Активация Токена Tinkoff
-from tinkoff.invest import Client, CandleInterval
+from t_tech.invest import Client, CandleInterval
 
 TINKOFF_API_TOKEN = os.getenv("TINKOFF_API_TOKEN")
 client = Client(TINKOFF_API_TOKEN)
