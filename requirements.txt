@@ -5,6 +5,5 @@ matplotlib
 scipy
 requests
 flask
-git+https://github.com/Tinkoff/invest-python.git
-tinkoff-investments
+invest-python
 aiohttp
