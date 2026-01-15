@@ -167,7 +167,7 @@ def get_figi_by_ticker_with_cache(ticker: str) -> str | None:
     
     print(f"🌐 Загружаем FIGI для {ticker} из Tinkoff API")
     try:
-        from tinkoff.invest import Client
+        from t_tech.invest import Client
         TINKOFF_API_TOKEN = os.getenv("TINKOFF_API_TOKEN")
         
         with Client(TINKOFF_API_TOKEN) as client:
