@@ -5,6 +5,5 @@ matplotlib
 scipy
 requests
 flask
-tinkoff-investments
 tinkoff-investments-python
 aiohttp
