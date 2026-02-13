@@ -1227,7 +1227,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         start_time = datetime.now()
         MAX_EXECUTION_TIME = 1800  # 30 минут
         
-        all_tickers = sum(SECTORS1.values(), [])
+        all_tickers = sum(SECTORS.values(), [])
         print(f"🔁 Всего тикеров для обработки: {len(all_tickers)}")
         
         long_hits, short_hits = [], []
