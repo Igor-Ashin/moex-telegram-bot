@@ -142,7 +142,8 @@ async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === ФУНКЦИИ ПОЛУЧЕНИЯ ДАННЫХ ===
 
-def get_moex_data(ticker="SBER", days=120):
+    
+def get_moex_data_old(ticker="SBER", days=120):
     """Получение дневных данных с MOEX"""
     try:
         till = datetime.today().strftime('%Y-%m-%d')
@@ -167,9 +168,87 @@ def get_moex_data(ticker="SBER", days=120):
         return df.tail(days)
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
+        return pd.DataFrame() 
+          
+    
+def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
+    """Загружает 1D свечи по тикеру из Tinkoff Invest API (вместо ISS MOEX)"""
+    try:
+        figi = figicache.get(ticker)
+        if figi is None:
+            print(f"❌ FIGI для тикера {ticker} не найдено")
+            return pd.DataFrame()
+
+        print(f"📡 Используем FIGI {figi} для загрузки данных {ticker}")
+
+        to_dt = datetime.now(ZoneInfo("Europe/Moscow"))
+        # запас по времени, чтобы наверняка набрать days дневных свечей (выходные/праздники)
+        from_dt = to_dt - timedelta(days=int(days * 2.2))
+
+        with Client(TINKOFFAPITOKEN) as client:
+            candles_response = client.marketdata.get_candles(
+                figi=figi,
+                from_=from_dt,
+                to=to_dt,
+                interval=CandleInterval.CANDLE_INTERVAL_DAY,
+            )
+
+        import time
+        time.sleep(0.1)  # 100мс задержка после каждого запроса к API
+
+        if not candles_response.candles:
+            print(f"❌ Нет данных свечей для {ticker}")
+            return pd.DataFrame()
+
+        data = []
+        for c in candles_response.candles:
+            try:
+                open_p = c.open.units + c.open.nano / 1e9
+                high_p = c.high.units + c.high.nano / 1e9
+                low_p = c.low.units + c.low.nano / 1e9
+                close_p = c.close.units + c.close.nano / 1e9
+                volume = c.volume
+                timestamp = pd.to_datetime(c.time)
+
+                data.append({
+                    "time": timestamp,
+                    "open": open_p,
+                    "high": high_p,
+                    "low": low_p,
+                    "close": close_p,
+                    "volume": volume
+                })
+            except Exception as candle_e:
+                print(f"❌ Ошибка обработки свечи для {ticker}: {candle_e}")
+                continue
+
+        if not data:
+            print(f"❌ Нет валидных данных для {ticker}")
+            return pd.DataFrame()
+
+        df = pd.DataFrame(data)
+        df["time"] = pd.to_datetime(df["time"])
+        df = df.set_index("time").sort_index()
+
+        # Обработка временных зон
+        if df.index.tz is None:
+            df.index = df.index.tz_localize('UTC')
+        df.index = df.index.tz_convert('Europe/Moscow')
+
+        # ВАЖНО: дальше по коду у тебя часто ожидаются колонки close/volume/high/low
+        df = df[["close", "volume", "high", "low"]].dropna()
+
+        print(f"✅ Загружено {len(df)} свечей для {ticker}")
+        return df.tail(days)
+
+    except Exception as e:
+        print(f"❌ Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
 
-def get_moex_weekly_data(ticker="SBER", weeks=80):
+
+
+
+def get_moex_weekly_data_old(ticker="SBER", weeks=80):
     """Получение недельных данных с MOEX"""
     try:
         till = datetime.today().strftime('%Y-%m-%d')
@@ -205,6 +284,28 @@ def get_figi_by_ticker(ticker: str) -> str | None:
         print(f"Ошибка поиска FIGI для {ticker}: {e}")
         return None
 """
+
+def get_moex_weekly_data(ticker: str = "SBER", weeks: int = 80) -> pd.DataFrame:
+    """Загружает 1W свечи по тикеру: агрегируем из 1D (вместо ISS MOEX)"""
+    try:
+        # Берем дневные с запасом, чтобы точно собрать weeks недель
+        df1d = get_moex_data(ticker, days=max(int(weeks * 7 * 2.2), 220))
+        if df1d.empty:
+            return pd.DataFrame()
+
+        # close = last, high=max, low=min, volume=sum
+        wdf = pd.DataFrame({
+            "close": df1d["close"].resample("W-FRI").last(),
+            "high": df1d["high"].resample("W-FRI").max(),
+            "low": df1d["low"].resample("W-FRI").min(),
+            "volume": df1d["volume"].resample("W-FRI").sum(),
+        }).dropna(subset=["close"])
+
+        return wdf.tail(weeks)
+
+    except Exception as e:
+        print(f"❌ Ошибка получения weekly данных для {ticker}: {e}")
+        return pd.DataFrame()
 
 
 
