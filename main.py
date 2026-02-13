@@ -186,7 +186,7 @@ def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
         from_dt = to_dt - timedelta(days=int(days * 2.2))
 
         with Client(TINKOFF_API_TOKEN) as client:
-            candles_response = client.marketdata.get_candles(
+            candles_response = client.market_data.get_candles(
                 figi=figi,
                 from_=from_dt,
                 to=to_dt,
