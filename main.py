@@ -142,9 +142,9 @@ async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === ФУНКЦИИ ПОЛУЧЕНИЯ ДАННЫХ ===
 
-    
+    """
 def get_moex_data_old(ticker="SBER", days=120):
-    """Получение дневных данных с MOEX"""
+    #Получение дневных данных с MOEX
     try:
         till = datetime.today().strftime('%Y-%m-%d')
         from_date = (datetime.today() - pd.Timedelta(days=days * 1.5)).strftime('%Y-%m-%d')
@@ -169,7 +169,7 @@ def get_moex_data_old(ticker="SBER", days=120):
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame() 
-          
+     """     
     
 def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
     """Загружает 1D свечи по тикеру из Tinkoff Invest API (вместо ISS MOEX)"""
@@ -247,9 +247,9 @@ def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
 
 
 
-
+    """
 def get_moex_weekly_data_old(ticker="SBER", weeks=80):
-    """Получение недельных данных с MOEX"""
+    #Получение недельных данных с MOEX
     try:
         till = datetime.today().strftime('%Y-%m-%d')
         from_date = (datetime.today() - pd.Timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
@@ -269,7 +269,7 @@ def get_moex_weekly_data_old(ticker="SBER", weeks=80):
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
-"""
+""" """
 def get_figi_by_ticker(ticker: str) -> str | None:
     #Получение FIGI по тикеру
     try:
@@ -1874,28 +1874,6 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(msg, parse_mode="HTML")
 
-
-# Получение данных для Штейн
-def get_moex_weekly_data(ticker="SBER", weeks=80):
-    try:
-        till = datetime.today().strftime('%Y-%m-%d')
-        from_date = (datetime.today() - pd.Timedelta(weeks=weeks * 1.5)).strftime('%Y-%m-%d')
-        url = f"https://iss.moex.com/iss/engines/stock/markets/shares/securities/{ticker}/candles.json?interval=7&from={from_date}&till={till}"
-        r = requests.get(url, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        candles = data['candles']['data']
-        columns = data['candles']['columns']
-        df = pd.DataFrame(candles, columns=columns)
-        df['begin'] = pd.to_datetime(df['begin'])
-        df = df.sort_values('begin')
-        df.set_index('begin', inplace=True)
-        df = df.rename(columns={'close': 'close'})
-        df = df[['close']].dropna()
-        return df.tail(weeks)
-    except Exception as e:
-        print(f"Ошибка получения данных для {ticker}: {e}")
-        return pd.DataFrame()
 
 
 # Telegram команды
