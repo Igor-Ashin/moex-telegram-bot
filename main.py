@@ -185,7 +185,7 @@ def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
         # запас по времени, чтобы наверняка набрать days дневных свечей (выходные/праздники)
         from_dt = to_dt - timedelta(days=int(days * 2.2))
 
-        with Client(TINKOFFAPITOKEN) as client:
+        with Client(TINKOFF_API_TOKEN) as client:
             candles_response = client.marketdata.get_candles(
                 figi=figi,
                 from_=from_dt,
