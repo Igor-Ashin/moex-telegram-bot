@@ -5,5 +5,5 @@ matplotlib
 scipy
 requests
 flask
-t-tech-investments
+t_tech
 aiohttp
