@@ -174,7 +174,7 @@ def get_moex_data_old(ticker="SBER", days=120):
 def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
     #Загружает 1D свечи по тикеру из Tinkoff Invest API (вместо ISS MOEX)
     try:
-        figi = figicache.get(ticker)
+        figi = figi_cache.get(ticker)
         if figi is None:
             print(f"❌ FIGI для тикера {ticker} не найдено")
             return pd.DataFrame()
@@ -286,27 +286,41 @@ def get_figi_by_ticker(ticker: str) -> str | None:
 """
 
 def get_moex_weekly_data(ticker: str = "SBER", weeks: int = 80) -> pd.DataFrame:
-    #Загружает 1W свечи по тикеру: агрегируем из 1D (вместо ISS MOEX)
     try:
-        # Берем дневные с запасом, чтобы точно собрать weeks недель
-        df1d = get_moex_data(ticker, days=max(int(weeks * 7 * 2.2), 220))
-        if df1d.empty:
+        figi = figi_cache.get(ticker)
+        if figi is None:
+            print(f"❌ FIGI для тикера {ticker} не найден")
             return pd.DataFrame()
 
-        # close = last, high=max, low=min, volume=sum
-        wdf = pd.DataFrame({
-            "close": df1d["close"].resample("W-FRI").last(),
-            "high": df1d["high"].resample("W-FRI").max(),
-            "low": df1d["low"].resample("W-FRI").min(),
-            "volume": df1d["volume"].resample("W-FRI").sum(),
-        }).dropna(subset=["close"])
+        to_dt = datetime.now(ZoneInfo("Europe/Moscow"))
+        from_dt = to_dt - timedelta(weeks=weeks + 2)
 
-        return wdf.tail(weeks)
+        candles = []
+        with Client(TINKOFF_API_TOKEN) as client:
+            for candle in client.get_all_candles(
+                figi=figi,
+                from_=from_dt,
+                to=to_dt,
+                interval=CandleInterval.CANDLE_INTERVAL_WEEK,
+            ):
+                candles.append({
+                    "time": candle.time,
+                    "open": candle.open.units + candle.open.nano / 1e9,
+                    "high": candle.high.units + candle.high.nano / 1e9,
+                    "low": candle.low.units + candle.low.nano / 1e9,
+                    "close": candle.close.units + candle.close.nano / 1e9,
+                    "volume": candle.volume
+                })
+
+        if not candles:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(candles).set_index("time").sort_index()
+        return df.tail(weeks)
 
     except Exception as e:
-        print(f"❌ Ошибка получения weekly данных для {ticker}: {e}")
+        print(f"❌ Ошибка weekly данных для {ticker}: {e}")
         return pd.DataFrame()
-
 
 
 
