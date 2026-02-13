@@ -142,7 +142,7 @@ async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === ФУНКЦИИ ПОЛУЧЕНИЯ ДАННЫХ ===
 
-    """
+"""
 def get_moex_data_old(ticker="SBER", days=120):
     #Получение дневных данных с MOEX
     try:
@@ -169,10 +169,10 @@ def get_moex_data_old(ticker="SBER", days=120):
     except Exception as e:
         print(f"Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame() 
-     """     
+"""     
     
 def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
-    """Загружает 1D свечи по тикеру из Tinkoff Invest API (вместо ISS MOEX)"""
+    #Загружает 1D свечи по тикеру из Tinkoff Invest API (вместо ISS MOEX)
     try:
         figi = figicache.get(ticker)
         if figi is None:
@@ -247,7 +247,7 @@ def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
 
 
 
-    """
+"""
 def get_moex_weekly_data_old(ticker="SBER", weeks=80):
     #Получение недельных данных с MOEX
     try:
@@ -286,7 +286,7 @@ def get_figi_by_ticker(ticker: str) -> str | None:
 """
 
 def get_moex_weekly_data(ticker: str = "SBER", weeks: int = 80) -> pd.DataFrame:
-    """Загружает 1W свечи по тикеру: агрегируем из 1D (вместо ISS MOEX)"""
+    #Загружает 1W свечи по тикеру: агрегируем из 1D (вместо ISS MOEX)
     try:
         # Берем дневные с запасом, чтобы точно собрать weeks недель
         df1d = get_moex_data(ticker, days=max(int(weeks * 7 * 2.2), 220))
@@ -311,7 +311,7 @@ def get_moex_weekly_data(ticker: str = "SBER", weeks: int = 80) -> pd.DataFrame:
 
 
 def get_moex_data_4h_tinkoff(ticker: str = "SBER", days: int = 25) -> pd.DataFrame:
-    """Загружает 4H свечи по тикеру из Tinkoff Invest API"""
+    #Загружает 4H свечи по тикеру из Tinkoff Invest API
     try:
         figi = figi_cache.get(ticker)
         if figi is None:
