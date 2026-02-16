@@ -1,4 +1,4 @@
-# main.py (moex_stock_bot.py с интеграцией кэширования)
+# main.py 
 
 import matplotlib
 matplotlib.use('Agg')  # Включаем "безголовый" режим для matplotlib
@@ -14,7 +14,7 @@ from scipy.signal import argrelextrema
 import asyncio
 import html
 import concurrent.futures
-
+import time as _time
 
 # Активация Токена Tinkoff
 from t_tech.invest import Client, CandleInterval
@@ -95,8 +95,54 @@ def load_figi_cache_from_file():
 # Загружаем figi_cache из файла
 figi_cache = load_figi_cache_from_file()
 
+# === RATE LIMITER ДЛЯ T-INVEST API ===
+# Лимиты: 120 unary запросов/мин — используем 100 с запасом (~1.67 req/sec)
 
-# === ФУНКЦИИ ПОЛУЧЕНИЯ ДАННЫХ ===
+class RateLimiter:
+    """
+    Токен-бакет лимитер для T-Invest API.
+    Семафор ограничивает параллельность, интервал — частоту запросов.
+    """
+    def __init__(self, rate_per_minute: int = 100):
+        self._interval = 60.0 / rate_per_minute  # секунд между запросами
+        self._semaphore = asyncio.Semaphore(8)    # макс. 8 одновременных
+        self._last_call: float = 0.0
+        self._lock = asyncio.Lock()
+
+    async def acquire(self):
+        async with self._lock:
+            now = _time.monotonic()
+            wait = self._interval - (now - self._last_call)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_call = _time.monotonic()
+
+    async def __aenter__(self):
+        await self._semaphore.acquire()
+        await self.acquire()
+        return self
+
+    async def __aexit__(self, *args):
+        self._semaphore.release()
+
+
+# Глобальный лимитер (один на весь процесс)
+_rate_limiter = RateLimiter(rate_per_minute=100)
+
+# === ASYNC-ОБЁРТКИ ДЛЯ API-ФУНКЦИЙ ===
+
+async def async_get_moex_data(ticker: str, days: int = 100) -> pd.DataFrame:
+    """Async-обёртка над get_moex_data с соблюдением rate limit."""
+    async with _rate_limiter:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, lambda: get_moex_data(ticker, days))
+
+
+async def async_get_moex_weekly_data(ticker: str, weeks: int = 80) -> pd.DataFrame:
+    """Async-обёртка над get_moex_weekly_data с соблюдением rate limit."""
+    async with _rate_limiter:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, lambda: get_moex_weekly_data(ticker, weeks))
 
 """
 def get_moex_data_old(ticker="SBER", days=120):
@@ -200,7 +246,6 @@ def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
     except Exception as e:
         print(f"❌ Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
-
 
 
 """
@@ -373,7 +418,6 @@ def parallel_get_4h_data(tickers, days=25, max_workers=10):
             results[ticker] = df
     return results  # словарь: {ticker: DataFrame}
     
-
 
 # === ТЕХНИЧЕСКИЕ ИНДИКАТОРЫ ===
 
@@ -700,81 +744,100 @@ if Update and ContextTypes:
 
 
     async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с повышенным объёмом…")
-        rows = []
-        
-        for ticker in sum(SECTORS.values(), []):
+        await update.message.reply_text("🔍 Ищу акции с повышенным объёмом… (параллельный режим)")
+
+        all_tickers = sum(SECTORS.values(), [])
+
+        # ── Волна 1: все дневные данные параллельно ───────────────────────────
+        async def _fetch_daily(ticker: str):
             try:
-                df = get_moex_data(ticker, days=100)
-                if df.empty or len(df) < 60: 
-                    continue
-                    
-                # Расчёт среднего оборота за 10 дней
-                volume_series = df['volume'].iloc[-11:-1]
-                close_series = df['close'].iloc[-11:-1]
-                turnover_series = volume_series * close_series
-                avg_turnover = turnover_series.mean()
-                
-                # Сегодняшний оборот
-                today_volume = df['volume'].iloc[-1]
-                today_close = df['close'].iloc[-1]
-                today_turnover = today_volume * today_close
-                
+                df = await async_get_moex_data(ticker, days=100)
+                return ticker, df
+            except Exception as e:
+                print(f"[high_volume] daily error {ticker}: {e}")
+                return ticker, None
+
+        daily_results = await asyncio.gather(*[_fetch_daily(t) for t in all_tickers])
+        daily_map = {t: df for t, df in daily_results}
+
+        # ── Фильтр: оставляем только тикеры с ratio >= 1.2 ───────────────────
+        need_weekly = []
+        for ticker, df in daily_map.items():
+            if df is None or df.empty or len(df) < 60:
+                continue
+            avg_turnover   = (df['volume'].iloc[-11:-1] * df['close'].iloc[-11:-1]).mean()
+            today_turnover = df['volume'].iloc[-1] * df['close'].iloc[-1]
+            ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
+            if ratio >= 1.2:
+                need_weekly.append(ticker)
+
+        # ── Волна 2: недельные данные только для кандидатов ──────────────────
+        async def _fetch_weekly(ticker: str):
+            try:
+                wdf = await async_get_moex_weekly_data(ticker, weeks=80)
+                return ticker, wdf
+            except Exception as e:
+                print(f"[high_volume] weekly error {ticker}: {e}")
+                return ticker, None
+
+        weekly_results = await asyncio.gather(*[_fetch_weekly(t) for t in need_weekly])
+        weekly_map = {t: wdf for t, wdf in weekly_results}
+
+        # ── Считаем метрики и собираем строки ────────────────────────────────
+        rows = []
+        for ticker in need_weekly:
+            try:
+                df  = daily_map[ticker]
+                wdf = weekly_map.get(ticker)
+
+                avg_turnover   = (df['volume'].iloc[-11:-1] * df['close'].iloc[-11:-1]).mean()
+                today_turnover = df['volume'].iloc[-1] * df['close'].iloc[-1]
                 ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
-                
-                if ratio < 1.2:
-                    continue
-                    
-                # EMA20/EMA50 Daily
+
                 df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
                 df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
-                
-                current_ema20 = df['EMA20'].iloc[-1]
-                current_ema50 = df['EMA50'].iloc[-1]
-                current_price = df['close'].iloc[-1]
-                
-                ema20x50_long = (current_ema20 > current_ema50) and (current_price > current_ema20)
+                current_ema20  = df['EMA20'].iloc[-1]
+                current_ema50  = df['EMA50'].iloc[-1]
+                current_price  = df['close'].iloc[-1]
+
+                ema20x50_long  = (current_ema20 > current_ema50) and (current_price > current_ema20)
                 ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
-                price_change = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
-                
+                price_change   = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
+
                 # SMA30 Weekly
-                try:
-                    wdf = get_moex_weekly_data(ticker, weeks=80)
-                    if len(wdf) >= 30:
-                        wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
-                        weekly_sma30 = wdf['SMA30'].iloc[-1]
-                        weekly_price = wdf['close'].iloc[-1]
-                        price_above_sma30 = weekly_price > weekly_sma30 if pd.notna(weekly_sma30) else False
-                    else:
-                        price_above_sma30 = False
-                except:
-                    price_above_sma30 = False
+                price_above_sma30 = False
+                if wdf is not None and not wdf.empty and len(wdf) >= 30:
+                    wdf = wdf.copy()
+                    wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
+                    weekly_sma30 = wdf['SMA30'].iloc[-1]
+                    weekly_price = wdf['close'].iloc[-1]
+                    price_above_sma30 = (weekly_price > weekly_sma30) if pd.notna(weekly_sma30) else False
 
                 # Money Flow A/D
                 money_df = calculate_money_ad(df)
                 ad_delta = money_df['money_ad'].iloc[-1] - money_df['money_ad'].iloc[-11]
                 money_flow_icon = "🟢" if ad_delta > 0 else "🔴"
-                money_flow_str = f"{ad_delta/1_000_000:+.0f}M"
-                
+                money_flow_str  = f"{ad_delta/1_000_000:+.0f}M"
+
                 rows.append((
-                    ticker, 
-                    current_price, 
-                    price_change, 
-                    ratio, 
-                    ema20x50_long, 
+                    ticker,
+                    current_price,
+                    price_change,
+                    ratio,
+                    ema20x50_long,
                     ema20x50_short,
                     price_above_sma30,
                     money_flow_icon,
-                    money_flow_str
+                    money_flow_str,
                 ))
-                
+
             except Exception as e:
-                print(f"Ошибка для {ticker}: {e}")
+                print(f"[high_volume] calc error {ticker}: {e}")
                 continue
-        
+
         rows.sort(key=lambda x: x[3], reverse=True)
         rows = rows[:15]
-        
+
         if not rows:
             await update.message.reply_text("📊 Акций с повышенным объёмом не найдено")
             return
@@ -1835,37 +1898,90 @@ if Update and ContextTypes:
         await update.message.reply_text(result_text)
     
     async def stan_recent_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30...")
-        
-        crossovers = []
+        await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30… (параллельный режим)")
+
         all_tickers = sum(SECTORS.values(), [])
-        
-        # Проверяем каждый тикер
-        for ticker in all_tickers:
+        weeks = 5
+
+        # ── Волна 1: все недельные данные параллельно ─────────────────────────
+        async def _fetch_weekly(ticker: str):
             try:
-                crossover_date = find_sma30_crossover_week(ticker, weeks=5)
+                wdf = await async_get_moex_weekly_data(ticker, weeks=60)
+                return ticker, wdf
+            except Exception as e:
+                print(f"[stan_recent_week] weekly error {ticker}: {e}")
+                return ticker, None
+
+        weekly_results = await asyncio.gather(*[_fetch_weekly(t) for t in all_tickers])
+        weekly_map = {t: wdf for t, wdf in weekly_results}
+
+        # ── Быстрый фильтр в памяти: цена > SMA30 и есть crossover ───────────
+        weekly_candidates = []
+        for ticker, wdf in weekly_map.items():
+            if wdf is None or wdf.empty or len(wdf) < 35:
+                continue
+            wdf_copy = wdf.copy()
+            wdf_copy['SMA30'] = wdf_copy['close'].rolling(window=30).mean()
+            current_sma30 = wdf_copy['SMA30'].iloc[-1]
+            if pd.isna(current_sma30) or wdf_copy['close'].iloc[-1] <= current_sma30:
+                continue
+            recent = wdf_copy.tail(weeks + 1)
+            crossed = any(
+                recent['close'].iloc[i - 1] < recent['SMA30'].iloc[i - 1] and
+                recent['close'].iloc[i]     > recent['SMA30'].iloc[i]
+                for i in range(1, len(recent))
+            )
+            if crossed:
+                weekly_candidates.append(ticker)
+
+        # ── Волна 2: дневные данные только для кандидатов (фильтр оборота) ────
+        async def _fetch_daily(ticker: str):
+            try:
+                dfd = await async_get_moex_data(ticker, days=20)
+                return ticker, dfd
+            except Exception as e:
+                print(f"[stan_recent_week] daily error {ticker}: {e}")
+                return ticker, None
+
+        daily_results = await asyncio.gather(*[_fetch_daily(t) for t in weekly_candidates])
+        daily_map = {t: dfd for t, dfd in daily_results}
+
+        # ── Финальная проверка: оборот >= 50 млн + точная дата crossover ──────
+        crossovers = []
+        for ticker in weekly_candidates:
+            try:
+                dfd = daily_map.get(ticker)
+                if dfd is None or dfd.empty or len(dfd) < 15:
+                    continue
+                if (dfd['volume'].iloc[-10:] * dfd['close'].iloc[-10:]).mean() < 50_000_000:
+                    continue
+
+                wdf_copy = weekly_map[ticker].copy()
+                wdf_copy['SMA30'] = wdf_copy['close'].rolling(window=30).mean()
+                recent = wdf_copy.tail(weeks + 1)
+                crossover_date = None
+                for i in range(1, len(recent)):
+                    if (recent['close'].iloc[i - 1] < recent['SMA30'].iloc[i - 1] and
+                            recent['close'].iloc[i] > recent['SMA30'].iloc[i]):
+                        crossover_date = recent.index[i]
+                        break
                 if crossover_date:
                     crossovers.append((ticker, crossover_date))
             except Exception as e:
-                print(f"Ошибка при анализе {ticker}: {e}")
+                print(f"[stan_recent_week] final check error {ticker}: {e}")
                 continue
-        
+
         if not crossovers:
             await update.message.reply_text("📊 За последние 5 недель не найдено акций с пересечением цены через SMA30 снизу вверх.")
             return
-        
-        # Сортируем по дате (от самого свежего к самому старому)
+
         crossovers.sort(key=lambda x: x[1], reverse=True)
-        
-        # Формируем результат
+
         result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 5 недель:\n\n"
-        
         for ticker, date in crossovers:
-            formatted_date = date.strftime('%d.%m.%Y')
-            result_text += f"{ticker} {formatted_date}\n"
-        
+            result_text += f"{ticker} {date.strftime('%d.%m.%Y')}\n"
         result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
-        
+
         await update.message.reply_text(result_text)
 
     
