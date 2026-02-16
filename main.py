@@ -1,4 +1,4 @@
-# main.py 
+# main.py
 
 import matplotlib
 matplotlib.use('Agg')  # Включаем "безголовый" режим для matplotlib
@@ -472,62 +472,6 @@ def analyze_indicators(df):
 
 
 
-# === ФУНКЦИИ ПОСТРОЕНИЯ ГРАФИКОВ ===
-
-def plot_stock(df, ticker, levels=[], patterns=[]):
-    #Построение графика акции с техническим анализом
-    if df.empty:
-        return None
-    
-    try:
-        plt.figure(figsize=(12, 6))
-        plt.plot(df.index, df['close'], label='Цена', color='blue')
-
-        plt.plot(df.index, df['EMA9'], label='EMA9', linestyle='--', alpha=0.7)
-        plt.plot(df.index, df['EMA20'], label='EMA20', linestyle='--', alpha=0.7)
-        plt.plot(df.index, df['EMA50'], label='EMA50', linestyle='--', alpha=0.7)
-        plt.plot(df.index, df['EMA100'], label='EMA100', linestyle='--', alpha=0.7)
-        plt.plot(df.index, df['EMA200'], label='EMA200', linestyle='--', alpha=0.7)
-
-        # Аномальные объемы
-        for idx in df[df['Anomaly']].index:
-            volume_ratio = df.loc[idx, 'Volume_Multiplier']
-            plt.scatter(idx, df.loc[idx, 'close'], color='red')
-            plt.text(idx, df.loc[idx, 'close'], f"{volume_ratio:.1f}x", color='red', fontsize=8, ha='left')
-
-        # Уровни поддержки/сопротивления
-        for date, price in levels:
-            plt.axhline(price, linestyle='--', alpha=0.3)
-
-        # Паттерны
-        plotted_top = False
-        plotted_bottom = False
-        for name, date, price in patterns:
-            if name == 'Double Top':
-                marker = '^'
-                color = 'red'
-                label = 'Double Top' if not plotted_top else None
-                plotted_top = True
-            else:
-                marker = 'v'
-                color = 'green'
-                label = 'Double Bottom' if not plotted_bottom else None
-                plotted_bottom = True
-            plt.scatter(date, price, label=label, s=100, marker=marker, color=color)
-
-        plt.title(f"{ticker}: График с анализом")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        filename = f"{ticker}_analysis.png"
-        plt.savefig(filename)
-        plt.close()
-        return filename
-    except Exception as e:
-        print(f"Ошибка построения графика для {ticker}: {e}")
-        plt.close()
-        return None
-
 
 # === ФУНКЦИИ ПОИСКА ПЕРЕСЕЧЕНИЙ ===
 
@@ -660,193 +604,166 @@ def find_sma30_crossover_week(ticker, weeks=5):
 
 # === TELEGRAM КОМАНДЫ ===
 
-if Update and ContextTypes:
-    
-    
-    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-        text = (
-            "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
-            #f"{cache_info}"
-            "Команды:\n"
-            "/chart_hv — выбрать акцию через кнопки\n"
-            "/stan — анализ акции по методу Стэна Вайнштейна\n"
-            "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
-            "/cross_ema20x50_4h — акции с пересечением EMA 20x50 на 4H\n"
-            "/cross_ema9x50 — акции с пересечением EMA 20x50 на 1D\n"
-            "/cross_ema200 — акции с пересечением цены и EMA200 на 1D\n"
-            "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
-            "/stan_recent_d_short — акции с шорт пересечением SMA30 на 1D\n"
-            "/stan_recent_week — акции с лонг пересечением SMA30 на 1W\n"
-            "/moneyflow - Топ по росту и оттоку денежного потока (Money A/D)\n"
-            "/high_volume - Акции с повышенным объемом\n"
-            "/delta — расчет дельты денежного потока для конкретной акции\n"
-            "/rsi_top — Топ перекупленных и перепроданных акций по RSI и Стохастику\n"
-        )
-        await update.message.reply_text(text)
 
-    # Диалоговые функции
-    async def ask_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("📅 Введите количество дней для расчета дельты денежного потока (например, 10):")
-        return ASK_DAYS
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    async def receive_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        try:
-            days = int(update.message.text)
-            if not (1 <= days <= 100):
-                await update.message.reply_text("⚠️ Введите число от 1 до 100.")
-                return ASK_DAYS
+    text = (
+        "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
+        #f"{cache_info}"
+        "Команды:\n"
+        "/chart_hv — выбрать акцию через кнопки\n"
+        "/stan — анализ акции по методу Стэна Вайнштейна\n"
+        "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
+        "/cross_ema20x50_4h — акции с пересечением EMA 20x50 на 4H\n"
+        "/cross_ema9x50 — акции с пересечением EMA 20x50 на 1D\n"
+        "/cross_ema200 — акции с пересечением цены и EMA200 на 1D\n"
+        "/stan_recent — акции с лонг пересечением SMA30 на 1D\n"
+        "/stan_recent_d_short — акции с шорт пересечением SMA30 на 1D\n"
+        "/stan_recent_week — акции с лонг пересечением SMA30 на 1W\n"
+        "/moneyflow - Топ по росту и оттоку денежного потока (Money A/D)\n"
+        "/high_volume - Акции с повышенным объемом\n"
+        "/delta — расчет дельты денежного потока для конкретной акции\n"
+        "/rsi_top — Топ перекупленных и перепроданных акций по RSI и Стохастику\n"
+    )
+    await update.message.reply_text(text)
 
-            context.user_data['days'] = days
-            await long_moneyflow(update, context)
-            return ConversationHandler.END
-        except ValueError:
-            await update.message.reply_text("⚠️ Введите целое число, например: 10")
+# Диалоговые функции
+async def ask_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📅 Введите количество дней для расчета дельты денежного потока (например, 10):")
+    return ASK_DAYS
+
+async def receive_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        days = int(update.message.text)
+        if not (1 <= days <= 100):
+            await update.message.reply_text("⚠️ Введите число от 1 до 100.")
             return ASK_DAYS
 
-    async def ask_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("📊 Введите тикер (или список тикеров) акции (например, SBER):")
-        return ASK_TICKER
+        context.user_data['days'] = days
+        await long_moneyflow(update, context)
+        return ConversationHandler.END
+    except ValueError:
+        await update.message.reply_text("⚠️ Введите целое число, например: 10")
+        return ASK_DAYS
 
-    async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        ticker_input = update.message.text.strip().upper()
-        
-        if not ticker_input:
-            await update.message.reply_text("⚠️ Введите один или несколько тикеров через запятую.")
-            return ASK_TICKER
-        
-        context.user_data['delta_ticker'] = ticker_input
-        await update.message.reply_text("📅 Укажите, за сколько дней рассчитать дельту (1–100):")
-        return ASK_DELTA_DAYS
+async def ask_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📊 Введите тикер (или список тикеров) акции (например, SBER):")
+    return ASK_TICKER
 
-    async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        try:
-            days = int(update.message.text)
-            if not (1 <= days <= 100):
-                await update.message.reply_text("⚠️ Введите число от 1 до 100.")
-                return ASK_DELTA_DAYS
-
-            ticker_input = context.user_data['delta_ticker']
-            tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
-
-            if not tickers:
-                await update.message.reply_text("⚠️ Не удалось распознать тикеры.")
-                return ConversationHandler.END
-
-            await update.message.reply_text(f"🔎 Обрабатываю {len(tickers)} тикеров за {days} дней...")
-            
-            for ticker in tickers:
-                await calculate_single_delta(update, context, ticker, days)
-                await asyncio.sleep(0.5)
-            
-            return ConversationHandler.END
-
-        except ValueError:
-            await update.message.reply_text("⚠️ Введите целое число, например: 10")
-            return ASK_DELTA_DAYS
-
+async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ticker_input = update.message.text.strip().upper()
     
-    # Основные команды анализа
-    async def chart_hv(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
-        await update.message.reply_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
+    if not ticker_input:
+        await update.message.reply_text("⚠️ Введите один или несколько тикеров через запятую.")
+        return ASK_TICKER
+    
+    context.user_data['delta_ticker'] = ticker_input
+    await update.message.reply_text("📅 Укажите, за сколько дней рассчитать дельту (1–100):")
+    return ASK_DELTA_DAYS
 
 
-    async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с повышенным объёмом… (параллельный режим)")
-        all_tickers = sum(SECTORS.values(), [])
+# Основные команды анализа
+async def chart_hv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
+    await update.message.reply_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-        # Волна 1: все дневные параллельно
-        async def _fetch_daily(ticker: str):
-            try:
-                return ticker, await async_get_moex_data(ticker, days=100)
-            except Exception as e:
-                print(f"[high_volume] daily error {ticker}: {e}")
-                return ticker, None
 
-        daily_results = await asyncio.gather(*[_fetch_daily(t) for t in all_tickers])
-        daily_map = {t: df for t, df in daily_results}
+async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу акции с повышенным объёмом… (параллельный режим)")
+    all_tickers = sum(SECTORS.values(), [])
 
-        # Фильтр: ratio >= 1.2
-        need_weekly = []
-        for ticker, df in daily_map.items():
-            if df is None or df.empty or len(df) < 60:
-                continue
+    # Волна 1: все дневные параллельно
+    async def _fetch_daily(ticker: str):
+        try:
+            return ticker, await async_get_moex_data(ticker, days=100)
+        except Exception as e:
+            print(f"[high_volume] daily error {ticker}: {e}")
+            return ticker, None
+
+    daily_results = await asyncio.gather(*[_fetch_daily(t) for t in all_tickers])
+    daily_map = {t: df for t, df in daily_results}
+
+    # Фильтр: ratio >= 1.2
+    need_weekly = []
+    for ticker, df in daily_map.items():
+        if df is None or df.empty or len(df) < 60:
+            continue
+        avg_turnover   = (df['volume'].iloc[-11:-1] * df['close'].iloc[-11:-1]).mean()
+        today_turnover = df['volume'].iloc[-1] * df['close'].iloc[-1]
+        if avg_turnover > 0 and today_turnover / avg_turnover >= 1.2:
+            need_weekly.append(ticker)
+
+    # Волна 2: недельные только для кандидатов
+    async def _fetch_weekly(ticker: str):
+        try:
+            return ticker, await async_get_moex_weekly_data(ticker, weeks=80)
+        except Exception as e:
+            print(f"[high_volume] weekly error {ticker}: {e}")
+            return ticker, None
+
+    weekly_results = await asyncio.gather(*[_fetch_weekly(t) for t in need_weekly])
+    weekly_map = {t: wdf for t, wdf in weekly_results}
+
+    rows = []
+    for ticker in need_weekly:
+        try:
+            df  = daily_map[ticker]
+            wdf = weekly_map.get(ticker)
+
             avg_turnover   = (df['volume'].iloc[-11:-1] * df['close'].iloc[-11:-1]).mean()
             today_turnover = df['volume'].iloc[-1] * df['close'].iloc[-1]
-            if avg_turnover > 0 and today_turnover / avg_turnover >= 1.2:
-                need_weekly.append(ticker)
+            ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
 
-        # Волна 2: недельные только для кандидатов
-        async def _fetch_weekly(ticker: str):
-            try:
-                return ticker, await async_get_moex_weekly_data(ticker, weeks=80)
-            except Exception as e:
-                print(f"[high_volume] weekly error {ticker}: {e}")
-                return ticker, None
+            df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+            df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+            current_ema20  = df['EMA20'].iloc[-1]
+            current_ema50  = df['EMA50'].iloc[-1]
+            current_price  = df['close'].iloc[-1]
 
-        weekly_results = await asyncio.gather(*[_fetch_weekly(t) for t in need_weekly])
-        weekly_map = {t: wdf for t, wdf in weekly_results}
+            ema20x50_long  = (current_ema20 > current_ema50) and (current_price > current_ema20)
+            ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
+            price_change   = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
 
-        rows = []
-        for ticker in need_weekly:
-            try:
-                df  = daily_map[ticker]
-                wdf = weekly_map.get(ticker)
+            price_above_sma30 = False
+            if wdf is not None and not wdf.empty and len(wdf) >= 30:
+                wdf = wdf.copy()
+                wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
+                weekly_sma30 = wdf['SMA30'].iloc[-1]
+                price_above_sma30 = (wdf['close'].iloc[-1] > weekly_sma30) if pd.notna(weekly_sma30) else False
 
-                avg_turnover   = (df['volume'].iloc[-11:-1] * df['close'].iloc[-11:-1]).mean()
-                today_turnover = df['volume'].iloc[-1] * df['close'].iloc[-1]
-                ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
+            money_df = calculate_money_ad(df)
+            ad_delta = money_df['money_ad'].iloc[-1] - money_df['money_ad'].iloc[-11]
+            money_flow_icon = "🟢" if ad_delta > 0 else "🔴"
+            money_flow_str  = f"{ad_delta/1_000_000:+.0f}M"
 
-                df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
-                df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
-                current_ema20  = df['EMA20'].iloc[-1]
-                current_ema50  = df['EMA50'].iloc[-1]
-                current_price  = df['close'].iloc[-1]
+            rows.append((ticker, current_price, price_change, ratio,
+                         ema20x50_long, ema20x50_short, price_above_sma30,
+                         money_flow_icon, money_flow_str))
+        except Exception as e:
+            print(f"[high_volume] calc error {ticker}: {e}")
+            continue
 
-                ema20x50_long  = (current_ema20 > current_ema50) and (current_price > current_ema20)
-                ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
-                price_change   = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
+    rows.sort(key=lambda x: x[3], reverse=True)
+    rows = rows[:15]
 
-                price_above_sma30 = False
-                if wdf is not None and not wdf.empty and len(wdf) >= 30:
-                    wdf = wdf.copy()
-                    wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
-                    weekly_sma30 = wdf['SMA30'].iloc[-1]
-                    price_above_sma30 = (wdf['close'].iloc[-1] > weekly_sma30) if pd.notna(weekly_sma30) else False
+    if not rows:
+        await update.message.reply_text("📊 Акций с повышенным объёмом не найдено")
+        return
 
-                money_df = calculate_money_ad(df)
-                ad_delta = money_df['money_ad'].iloc[-1] - money_df['money_ad'].iloc[-11]
-                money_flow_icon = "🟢" if ad_delta > 0 else "🔴"
-                money_flow_str  = f"{ad_delta/1_000_000:+.0f}M"
-
-                rows.append((ticker, current_price, price_change, ratio,
-                             ema20x50_long, ema20x50_short, price_above_sma30,
-                             money_flow_icon, money_flow_str))
-            except Exception as e:
-                print(f"[high_volume] calc error {ticker}: {e}")
-                continue
-
-        rows.sort(key=lambda x: x[3], reverse=True)
-        rows = rows[:15]
-
-        if not rows:
-            await update.message.reply_text("📊 Акций с повышенным объёмом не найдено")
-            return
-
-        msg  = "📊 <b>Акции с повышенным объёмом</b>\n\n"
-        msg += "<pre>"
-        msg += f"{'Тикер':<6} {'Цена':>8} {'Δ Цены':>7} {'Объём':>6} {'ema20x50':>6} {'sma30':>6} {'Δ Потока':>10}\n"
-        msg += "-" * 60 + "\n"
-        for ticker, price, delta, ratio, ema20x50_long, ema20x50_short, sma_signal, mf_icon, mf_str in rows:
-            ema_icon = "🟢" if ema20x50_long else ("🔴" if ema20x50_short else "⚫")
-            sma_icon = "🟢" if sma_signal else "🔴"
-            msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>6} {sma_icon:>4} {mf_icon}{mf_str:>6}\n"
-        msg += "</pre>\n\n"
-        msg += "<i>EMA - пересечение EMA20x50 (D) на дневном ТФ</i>\n"
-        msg += "<i>SMA - цена выше SMA30 на недельном ТФ</i>\n"
-        msg += "<i>Δ Потока - приток/отток денежных средств (посл. 10 дней)</i>"
-        await update.message.reply_text(msg, parse_mode="HTML")
+    msg  = "📊 <b>Акции с повышенным объёмом</b>\n\n"
+    msg += "<pre>"
+    msg += f"{'Тикер':<6} {'Цена':>8} {'Δ Цены':>7} {'Объём':>6} {'ema20x50':>6} {'sma30':>6} {'Δ Потока':>10}\n"
+    msg += "-" * 60 + "\n"
+    for ticker, price, delta, ratio, ema20x50_long, ema20x50_short, sma_signal, mf_icon, mf_str in rows:
+        ema_icon = "🟢" if ema20x50_long else ("🔴" if ema20x50_short else "⚫")
+        sma_icon = "🟢" if sma_signal else "🔴"
+        msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>6} {sma_icon:>4} {mf_icon}{mf_str:>6}\n"
+    msg += "</pre>\n\n"
+    msg += "<i>EMA - пересечение EMA20x50 (D) на дневном ТФ</i>\n"
+    msg += "<i>SMA - цена выше SMA30 на недельном ТФ</i>\n"
+    msg += "<i>Δ Потока - приток/отток денежных средств (посл. 10 дней)</i>"
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 async def cross_ema200(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения цены и EMA200 за последние 50 дней…")
@@ -1756,222 +1673,221 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # Telegram команды
-if Update and ContextTypes:
 
-    async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30...")
-        
-        crossovers = []
-        all_tickers = sum(SECTORS.values(), [])
-        
-        # Проверяем каждый тикер
-        for ticker in all_tickers:
-            try:
-                crossover_date = find_sma30_crossover(ticker, days=7)
-                if crossover_date:
-                    crossovers.append((ticker, crossover_date))
-            except Exception as e:
-                print(f"Ошибка при анализе {ticker}: {e}")
-                continue
-        
-        if not crossovers:
-            await update.message.reply_text("📊 За последние 7 дней не найдено акций с пересечением цены через SMA30 снизу вверх.")
-            return
-        
-        # Сортируем по дате (от самого свежего к самому старому)
-        crossovers.sort(key=lambda x: x[1], reverse=True)
-        
-        # Формируем результат
-        result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 7 дней:\n\n"
-        
-        for ticker, date in crossovers:
-            formatted_date = date.strftime('%d.%m.%Y')
-            result_text += f"{ticker} {formatted_date}\n"
-        
-        result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
-        
-        await update.message.reply_text(result_text)
-
-
-    async def stan_recent_d_short(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с недавним short пересечением цены через SMA30...")
-        
-        crossovers = []
-        all_tickers = sum(SECTORS.values(), [])
-        
-        # Проверяем каждый тикер
-        for ticker in all_tickers:
-            try:
-                crossover_date = find_sma30_crossover_short(ticker, days=7)
-                if crossover_date:
-                    crossovers.append((ticker, crossover_date))
-            except Exception as e:
-                print(f"Ошибка при анализе {ticker}: {e}")
-                continue
-        
-        if not crossovers:
-            await update.message.reply_text("📊 За последние 7 дней не найдено акций с пересечением цены через SMA30 сверху вниз.")
-            return
-        
-        # Сортируем по дате (от самого свежего к самому старому)
-        crossovers.sort(key=lambda x: x[1], reverse=True)
-        
-        # Формируем результат
-        result_text = "📈 Акции с Short пересечением цены через SMA30 сверху вниз за последние 7 дней:\n\n"
-        
-        for ticker, date in crossovers:
-            formatted_date = date.strftime('%d.%m.%Y')
-            result_text += f"{ticker} {formatted_date}\n"
-        
-        result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
-        
-        await update.message.reply_text(result_text)
+async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30...")
     
-    async def stan_recent_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30… (параллельный режим)")
-        all_tickers = sum(SECTORS.values(), [])
-        weeks = 5
-
-        # Волна 1: все недельные параллельно
-        async def _fetch_weekly(ticker: str):
-            try:
-                return ticker, await async_get_moex_weekly_data(ticker, weeks=60)
-            except Exception as e:
-                print(f"[stan_recent_week] weekly error {ticker}: {e}")
-                return ticker, None
-
-        weekly_results = await asyncio.gather(*[_fetch_weekly(t) for t in all_tickers])
-        weekly_map = {t: wdf for t, wdf in weekly_results}
-
-        # Быстрый фильтр в памяти: цена > SMA30 и есть crossover
-        weekly_candidates = []
-        for ticker, wdf in weekly_map.items():
-            if wdf is None or wdf.empty or len(wdf) < 35:
-                continue
-            wdf_copy = wdf.copy()
-            wdf_copy['SMA30'] = wdf_copy['close'].rolling(window=30).mean()
-            current_sma30 = wdf_copy['SMA30'].iloc[-1]
-            if pd.isna(current_sma30) or wdf_copy['close'].iloc[-1] <= current_sma30:
-                continue
-            recent = wdf_copy.tail(weeks + 1)
-            crossed = any(
-                recent['close'].iloc[i - 1] < recent['SMA30'].iloc[i - 1] and
-                recent['close'].iloc[i]     > recent['SMA30'].iloc[i]
-                for i in range(1, len(recent))
-            )
-            if crossed:
-                weekly_candidates.append(ticker)
-
-        # Волна 2: дневные только для кандидатов (фильтр оборота)
-        async def _fetch_daily(ticker: str):
-            try:
-                return ticker, await async_get_moex_data(ticker, days=20)
-            except Exception as e:
-                print(f"[stan_recent_week] daily error {ticker}: {e}")
-                return ticker, None
-
-        daily_results = await asyncio.gather(*[_fetch_daily(t) for t in weekly_candidates])
-        daily_map = {t: dfd for t, dfd in daily_results}
-
-        crossovers = []
-        for ticker in weekly_candidates:
-            try:
-                dfd = daily_map.get(ticker)
-                if dfd is None or dfd.empty or len(dfd) < 15:
-                    continue
-                if (dfd['volume'].iloc[-10:] * dfd['close'].iloc[-10:]).mean() < 50_000_000:
-                    continue
-                wdf_copy = weekly_map[ticker].copy()
-                wdf_copy['SMA30'] = wdf_copy['close'].rolling(window=30).mean()
-                recent = wdf_copy.tail(weeks + 1)
-                crossover_date = None
-                for i in range(1, len(recent)):
-                    if (recent['close'].iloc[i - 1] < recent['SMA30'].iloc[i - 1] and
-                            recent['close'].iloc[i] > recent['SMA30'].iloc[i]):
-                        crossover_date = recent.index[i]
-                        break
-                if crossover_date:
-                    crossovers.append((ticker, crossover_date))
-            except Exception as e:
-                print(f"[stan_recent_week] final check error {ticker}: {e}")
-                continue
-
-        if not crossovers:
-            await update.message.reply_text("📊 За последние 5 недель не найдено акций с пересечением цены через SMA30 снизу вверх.")
-            return
-
-        crossovers.sort(key=lambda x: x[1], reverse=True)
-        result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 5 недель:\n\n"
-        for ticker, date in crossovers:
-            result_text += f"{ticker} {date.strftime('%d.%m.%Y')}\n"
-        result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
-        await update.message.reply_text(result_text)
-
+    crossovers = []
+    all_tickers = sum(SECTORS.values(), [])
     
-    # Обработчики callback
-    async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        query = update.callback_query
-        await query.answer()
-        data = query.data
-
+    # Проверяем каждый тикер
+    for ticker in all_tickers:
         try:
-            if data == "back_to_sectors":
-                keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
-                await query.edit_message_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-            elif data.startswith("sector:"):
-                _, sector, page = data.split(":")
-                page = int(page)
-                tickers = SECTORS.get(sector, [])
-                start = page * TICKERS_PER_PAGE
-                end = start + TICKERS_PER_PAGE
-                visible = tickers[start:end]
-
-                keyboard = [[InlineKeyboardButton(t, callback_data=f"ticker:{t}")] for t in visible]
-                nav = []
-                if start > 0:
-                    nav.append(InlineKeyboardButton("⬅️", callback_data=f"sector:{sector}:{page-1}"))
-                if end < len(tickers):
-                    nav.append(InlineKeyboardButton("➡️", callback_data=f"sector:{sector}:{page+1}"))
-                if nav:
-                    keyboard.append(nav)
-                keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="back_to_sectors")])
-
-                await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-            elif data.startswith("ticker:"):
-                ticker = data.split(":", 1)[1]
-                await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ...")
-
-                df = get_moex_data(ticker)
-                if df.empty:
-                    await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Не удалось получить данные для {ticker}")
-                    return
-
-                df = analyze_indicators(df)
-
-                chart = plot_stock(df, ticker, levels, patterns)
-                
-                if chart is None:
-                    await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Ошибка при создании графика для {ticker}")
-                    return
-
-                rsi_series = df['RSI'].dropna()
-                rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
-                latest_date = df.index.max().strftime('%Y-%m-%d')
-
-                text_summary = f"\nПоследний RSI: {rsi_value}\n"
-                text_summary += f"Актуальность данных: до {latest_date}\n"
-
-                with open(chart, 'rb') as photo:
-                    await context.bot.send_photo(chat_id=query.message.chat.id, photo=photo)
-                await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
-                
-                if os.path.exists(chart):
-                    os.remove(chart)
-
+            crossover_date = find_sma30_crossover(ticker, days=7)
+            if crossover_date:
+                crossovers.append((ticker, crossover_date))
         except Exception as e:
-            await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Произошла ошибка: {str(e)}")
+            print(f"Ошибка при анализе {ticker}: {e}")
+            continue
+    
+    if not crossovers:
+        await update.message.reply_text("📊 За последние 7 дней не найдено акций с пересечением цены через SMA30 снизу вверх.")
+        return
+    
+    # Сортируем по дате (от самого свежего к самому старому)
+    crossovers.sort(key=lambda x: x[1], reverse=True)
+    
+    # Формируем результат
+    result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 7 дней:\n\n"
+    
+    for ticker, date in crossovers:
+        formatted_date = date.strftime('%d.%m.%Y')
+        result_text += f"{ticker} {formatted_date}\n"
+    
+    result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
+    
+    await update.message.reply_text(result_text)
+
+
+async def stan_recent_d_short(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу акции с недавним short пересечением цены через SMA30...")
+    
+    crossovers = []
+    all_tickers = sum(SECTORS.values(), [])
+    
+    # Проверяем каждый тикер
+    for ticker in all_tickers:
+        try:
+            crossover_date = find_sma30_crossover_short(ticker, days=7)
+            if crossover_date:
+                crossovers.append((ticker, crossover_date))
+        except Exception as e:
+            print(f"Ошибка при анализе {ticker}: {e}")
+            continue
+    
+    if not crossovers:
+        await update.message.reply_text("📊 За последние 7 дней не найдено акций с пересечением цены через SMA30 сверху вниз.")
+        return
+    
+    # Сортируем по дате (от самого свежего к самому старому)
+    crossovers.sort(key=lambda x: x[1], reverse=True)
+    
+    # Формируем результат
+    result_text = "📈 Акции с Short пересечением цены через SMA30 сверху вниз за последние 7 дней:\n\n"
+    
+    for ticker, date in crossovers:
+        formatted_date = date.strftime('%d.%m.%Y')
+        result_text += f"{ticker} {formatted_date}\n"
+    
+    result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
+    
+    await update.message.reply_text(result_text)
+
+async def stan_recent_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30… (параллельный режим)")
+    all_tickers = sum(SECTORS.values(), [])
+    weeks = 5
+
+    # Волна 1: все недельные параллельно
+    async def _fetch_weekly(ticker: str):
+        try:
+            return ticker, await async_get_moex_weekly_data(ticker, weeks=60)
+        except Exception as e:
+            print(f"[stan_recent_week] weekly error {ticker}: {e}")
+            return ticker, None
+
+    weekly_results = await asyncio.gather(*[_fetch_weekly(t) for t in all_tickers])
+    weekly_map = {t: wdf for t, wdf in weekly_results}
+
+    # Быстрый фильтр в памяти: цена > SMA30 и есть crossover
+    weekly_candidates = []
+    for ticker, wdf in weekly_map.items():
+        if wdf is None or wdf.empty or len(wdf) < 35:
+            continue
+        wdf_copy = wdf.copy()
+        wdf_copy['SMA30'] = wdf_copy['close'].rolling(window=30).mean()
+        current_sma30 = wdf_copy['SMA30'].iloc[-1]
+        if pd.isna(current_sma30) or wdf_copy['close'].iloc[-1] <= current_sma30:
+            continue
+        recent = wdf_copy.tail(weeks + 1)
+        crossed = any(
+            recent['close'].iloc[i - 1] < recent['SMA30'].iloc[i - 1] and
+            recent['close'].iloc[i]     > recent['SMA30'].iloc[i]
+            for i in range(1, len(recent))
+        )
+        if crossed:
+            weekly_candidates.append(ticker)
+
+    # Волна 2: дневные только для кандидатов (фильтр оборота)
+    async def _fetch_daily(ticker: str):
+        try:
+            return ticker, await async_get_moex_data(ticker, days=20)
+        except Exception as e:
+            print(f"[stan_recent_week] daily error {ticker}: {e}")
+            return ticker, None
+
+    daily_results = await asyncio.gather(*[_fetch_daily(t) for t in weekly_candidates])
+    daily_map = {t: dfd for t, dfd in daily_results}
+
+    crossovers = []
+    for ticker in weekly_candidates:
+        try:
+            dfd = daily_map.get(ticker)
+            if dfd is None or dfd.empty or len(dfd) < 15:
+                continue
+            if (dfd['volume'].iloc[-10:] * dfd['close'].iloc[-10:]).mean() < 50_000_000:
+                continue
+            wdf_copy = weekly_map[ticker].copy()
+            wdf_copy['SMA30'] = wdf_copy['close'].rolling(window=30).mean()
+            recent = wdf_copy.tail(weeks + 1)
+            crossover_date = None
+            for i in range(1, len(recent)):
+                if (recent['close'].iloc[i - 1] < recent['SMA30'].iloc[i - 1] and
+                        recent['close'].iloc[i] > recent['SMA30'].iloc[i]):
+                    crossover_date = recent.index[i]
+                    break
+            if crossover_date:
+                crossovers.append((ticker, crossover_date))
+        except Exception as e:
+            print(f"[stan_recent_week] final check error {ticker}: {e}")
+            continue
+
+    if not crossovers:
+        await update.message.reply_text("📊 За последние 5 недель не найдено акций с пересечением цены через SMA30 снизу вверх.")
+        return
+
+    crossovers.sort(key=lambda x: x[1], reverse=True)
+    result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 5 недель:\n\n"
+    for ticker, date in crossovers:
+        result_text += f"{ticker} {date.strftime('%d.%m.%Y')}\n"
+    result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
+    await update.message.reply_text(result_text)
+
+
+# Обработчики callback
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    try:
+        if data == "back_to_sectors":
+            keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
+            await query.edit_message_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data.startswith("sector:"):
+            _, sector, page = data.split(":")
+            page = int(page)
+            tickers = SECTORS.get(sector, [])
+            start = page * TICKERS_PER_PAGE
+            end = start + TICKERS_PER_PAGE
+            visible = tickers[start:end]
+
+            keyboard = [[InlineKeyboardButton(t, callback_data=f"ticker:{t}")] for t in visible]
+            nav = []
+            if start > 0:
+                nav.append(InlineKeyboardButton("⬅️", callback_data=f"sector:{sector}:{page-1}"))
+            if end < len(tickers):
+                nav.append(InlineKeyboardButton("➡️", callback_data=f"sector:{sector}:{page+1}"))
+            if nav:
+                keyboard.append(nav)
+            keyboard.append([InlineKeyboardButton("🔙 Назад к отраслям", callback_data="back_to_sectors")])
+
+            await query.edit_message_text(f"Вы выбрали отрасль: {sector}. Теперь выберите тикер:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data.startswith("ticker:"):
+            ticker = data.split(":", 1)[1]
+            await query.edit_message_text(f"Вы выбрали тикер: {ticker}. Выполняется анализ...")
+
+            df = get_moex_data(ticker)
+            if df.empty:
+                await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Не удалось получить данные для {ticker}")
+                return
+
+            df = analyze_indicators(df)
+
+            chart = plot_stock(df, ticker, levels, patterns)
+            
+            if chart is None:
+                await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Ошибка при создании графика для {ticker}")
+                return
+
+            rsi_series = df['RSI'].dropna()
+            rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
+            latest_date = df.index.max().strftime('%Y-%m-%d')
+
+            text_summary = f"\nПоследний RSI: {rsi_value}\n"
+            text_summary += f"Актуальность данных: до {latest_date}\n"
+
+            with open(chart, 'rb') as photo:
+                await context.bot.send_photo(chat_id=query.message.chat.id, photo=photo)
+            await context.bot.send_message(chat_id=query.message.chat.id, text=text_summary)
+            
+            if os.path.exists(chart):
+                os.remove(chart)
+
+    except Exception as e:
+        await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Произошла ошибка: {str(e)}")
 
 # === ЗАПУСК БОТА ===
 
