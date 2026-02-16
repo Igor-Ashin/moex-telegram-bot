@@ -42,8 +42,8 @@ def set_webhook():
         print(f"Ошибка при установке webhook: {response.text}")
 
 
-if __name__ == "__main__":
-    set_webhook()
+#if __name__ == "__main__":
+#    set_webhook()
 
 # Telegram импорты
 try:
@@ -110,7 +110,7 @@ class RateLimiter:
         self._lock: asyncio.Lock | None = None
 
     def _ensure_primitives(self):
-        """Создаём Semaphore и Lock в контексте работающего event loop."""
+        #Создаём Semaphore и Lock в контексте работающего event loop
         if self._semaphore is None:
             self._semaphore = asyncio.Semaphore(8)
         if self._lock is None:
@@ -139,14 +139,14 @@ _rate_limiter = RateLimiter(rate_per_minute=100)
 
 
 async def async_get_moex_data(ticker: str, days: int = 100) -> pd.DataFrame:
-    """Async-обёртка над get_moex_data с соблюдением rate limit."""
+    #Async-обёртка над get_moex_data с соблюдением rate limit
     async with _rate_limiter:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, lambda: get_moex_data(ticker, days))
 
 
 async def async_get_moex_weekly_data(ticker: str, weeks: int = 80) -> pd.DataFrame:
-    """Async-обёртка над get_moex_weekly_data с соблюдением rate limit."""
+    #Async-обёртка над get_moex_weekly_data с соблюдением rate limit
     async with _rate_limiter:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, lambda: get_moex_weekly_data(ticker, weeks))
@@ -431,7 +431,7 @@ def parallel_get_4h_data(tickers, days=25, max_workers=10):
 # === ТЕХНИЧЕСКИЕ ИНДИКАТОРЫ ===
 
 def compute_rsi(series, window=14):
-    """Вычисляет RSI используя pandas ewm для сглаживания Wilder's"""
+    #Вычисляет RSI используя pandas ewm для сглаживания Wilder's
     if len(series) < window + 1:
         return pd.Series([np.nan] * len(series), index=series.index)
     
@@ -455,7 +455,7 @@ def compute_rsi(series, window=14):
 
 
 def analyze_indicators(df):
-    """Анализ технических индикаторов"""
+    #Анализ технических индикаторов
     if df.empty:
         return df
     
@@ -612,8 +612,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
         #f"{cache_info}"
         "Команды:\n"
-        "/chart_hv — выбрать акцию через кнопки\n"
-        "/stan — анализ акции по методу Стэна Вайнштейна\n"
         "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
         "/cross_ema20x50_4h — акции с пересечением EMA 20x50 на 4H\n"
         "/cross_ema9x50 — акции с пересечением EMA 20x50 на 1D\n"
@@ -1140,8 +1138,6 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except:
             print("❌ Не удалось отправить сообщение об ошибке")
-
-
 
 async def process_single_ticker(ticker: str):
     
@@ -1866,11 +1862,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             df = analyze_indicators(df)
 
-            chart = plot_stock(df, ticker, levels, patterns)
-            
-            if chart is None:
-                await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Ошибка при создании графика для {ticker}")
-                return
 
             rsi_series = df['RSI'].dropna()
             rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
