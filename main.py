@@ -2094,7 +2094,12 @@ if __name__ == '__main__':
         exit()
 
     # Создаём приложение
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = (
+    ApplicationBuilder()
+    .token(TOKEN)
+    .concurrent_updates(False)
+    .build()
+    )
 
     # === Добавляем хендлеры ===
     app.add_handler(CommandHandler("start", start))
