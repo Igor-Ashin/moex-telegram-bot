@@ -1,4 +1,4 @@
-# main.py 
+# main.py (moex_stock_bot.py с интеграцией кэширования)
 
 import matplotlib
 matplotlib.use('Agg')  # Включаем "безголовый" режим для matplotlib
@@ -15,6 +15,7 @@ import asyncio
 import html
 import concurrent.futures
 import time as _time
+
 
 # Активация Токена Tinkoff
 from t_tech.invest import Client, CandleInterval
@@ -95,17 +96,14 @@ def load_figi_cache_from_file():
 # Загружаем figi_cache из файла
 figi_cache = load_figi_cache_from_file()
 
+
 # === RATE LIMITER ДЛЯ T-INVEST API ===
-# Лимиты: 120 unary запросов/мин — используем 100 с запасом (~1.67 req/sec)
+# Лимиты: 120 unary запросов/мин — используем 100 с запасом
 
 class RateLimiter:
-    """
-    Токен-бакет лимитер для T-Invest API.
-    Семафор ограничивает параллельность, интервал — частоту запросов.
-    """
     def __init__(self, rate_per_minute: int = 100):
-        self._interval = 60.0 / rate_per_minute  # секунд между запросами
-        self._semaphore = asyncio.Semaphore(8)    # макс. 8 одновременных
+        self._interval = 60.0 / rate_per_minute
+        self._semaphore = asyncio.Semaphore(8)
         self._last_call: float = 0.0
         self._lock = asyncio.Lock()
 
@@ -126,10 +124,8 @@ class RateLimiter:
         self._semaphore.release()
 
 
-# Глобальный лимитер (один на весь процесс)
 _rate_limiter = RateLimiter(rate_per_minute=100)
 
-# === ASYNC-ОБЁРТКИ ДЛЯ API-ФУНКЦИЙ ===
 
 async def async_get_moex_data(ticker: str, days: int = 100) -> pd.DataFrame:
     """Async-обёртка над get_moex_data с соблюдением rate limit."""
@@ -246,6 +242,7 @@ def get_moex_data(ticker: str = "SBER", days: int = 120) -> pd.DataFrame:
     except Exception as e:
         print(f"❌ Ошибка получения данных для {ticker}: {e}")
         return pd.DataFrame()
+
 
 
 """
@@ -419,6 +416,7 @@ def parallel_get_4h_data(tickers, days=25, max_workers=10):
     return results  # словарь: {ticker: DataFrame}
     
 
+
 # === ТЕХНИЧЕСКИЕ ИНДИКАТОРЫ ===
 
 def compute_rsi(series, window=14):
@@ -461,63 +459,6 @@ def analyze_indicators(df):
     df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
     return df
 
-
-
-# === ФУНКЦИИ ПОСТРОЕНИЯ ГРАФИКОВ ===
-
-def plot_stock(df, ticker, levels=[], patterns=[]):
-    #Построение графика акции с техническим анализом
-    if df.empty:
-        return None
-    
-    try:
-        plt.figure(figsize=(12, 6))
-        plt.plot(df.index, df['close'], label='Цена', color='blue')
-
-        plt.plot(df.index, df['EMA9'], label='EMA9', linestyle='--', alpha=0.7)
-        plt.plot(df.index, df['EMA20'], label='EMA20', linestyle='--', alpha=0.7)
-        plt.plot(df.index, df['EMA50'], label='EMA50', linestyle='--', alpha=0.7)
-        plt.plot(df.index, df['EMA100'], label='EMA100', linestyle='--', alpha=0.7)
-        plt.plot(df.index, df['EMA200'], label='EMA200', linestyle='--', alpha=0.7)
-
-        # Аномальные объемы
-        for idx in df[df['Anomaly']].index:
-            volume_ratio = df.loc[idx, 'Volume_Multiplier']
-            plt.scatter(idx, df.loc[idx, 'close'], color='red')
-            plt.text(idx, df.loc[idx, 'close'], f"{volume_ratio:.1f}x", color='red', fontsize=8, ha='left')
-
-        # Уровни поддержки/сопротивления
-        for date, price in levels:
-            plt.axhline(price, linestyle='--', alpha=0.3)
-
-        # Паттерны
-        plotted_top = False
-        plotted_bottom = False
-        for name, date, price in patterns:
-            if name == 'Double Top':
-                marker = '^'
-                color = 'red'
-                label = 'Double Top' if not plotted_top else None
-                plotted_top = True
-            else:
-                marker = 'v'
-                color = 'green'
-                label = 'Double Bottom' if not plotted_bottom else None
-                plotted_bottom = True
-            plt.scatter(date, price, label=label, s=100, marker=marker, color=color)
-
-        plt.title(f"{ticker}: График с анализом")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        filename = f"{ticker}_analysis.png"
-        plt.savefig(filename)
-        plt.close()
-        return filename
-    except Exception as e:
-        print(f"Ошибка построения графика для {ticker}: {e}")
-        plt.close()
-        return None
 
 
 # === ФУНКЦИИ ПОИСКА ПЕРЕСЕЧЕНИЙ ===
@@ -745,14 +686,12 @@ if Update and ContextTypes:
 
     async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔍 Ищу акции с повышенным объёмом… (параллельный режим)")
-
         all_tickers = sum(SECTORS.values(), [])
 
-        # ── Волна 1: все дневные данные параллельно ───────────────────────────
+        # Волна 1: все дневные параллельно
         async def _fetch_daily(ticker: str):
             try:
-                df = await async_get_moex_data(ticker, days=100)
-                return ticker, df
+                return ticker, await async_get_moex_data(ticker, days=100)
             except Exception as e:
                 print(f"[high_volume] daily error {ticker}: {e}")
                 return ticker, None
@@ -760,22 +699,20 @@ if Update and ContextTypes:
         daily_results = await asyncio.gather(*[_fetch_daily(t) for t in all_tickers])
         daily_map = {t: df for t, df in daily_results}
 
-        # ── Фильтр: оставляем только тикеры с ratio >= 1.2 ───────────────────
+        # Фильтр: ratio >= 1.2
         need_weekly = []
         for ticker, df in daily_map.items():
             if df is None or df.empty or len(df) < 60:
                 continue
             avg_turnover   = (df['volume'].iloc[-11:-1] * df['close'].iloc[-11:-1]).mean()
             today_turnover = df['volume'].iloc[-1] * df['close'].iloc[-1]
-            ratio = today_turnover / avg_turnover if avg_turnover > 0 else 0
-            if ratio >= 1.2:
+            if avg_turnover > 0 and today_turnover / avg_turnover >= 1.2:
                 need_weekly.append(ticker)
 
-        # ── Волна 2: недельные данные только для кандидатов ──────────────────
+        # Волна 2: недельные только для кандидатов
         async def _fetch_weekly(ticker: str):
             try:
-                wdf = await async_get_moex_weekly_data(ticker, weeks=80)
-                return ticker, wdf
+                return ticker, await async_get_moex_weekly_data(ticker, weeks=80)
             except Exception as e:
                 print(f"[high_volume] weekly error {ticker}: {e}")
                 return ticker, None
@@ -783,7 +720,6 @@ if Update and ContextTypes:
         weekly_results = await asyncio.gather(*[_fetch_weekly(t) for t in need_weekly])
         weekly_map = {t: wdf for t, wdf in weekly_results}
 
-        # ── Считаем метрики и собираем строки ────────────────────────────────
         rows = []
         for ticker in need_weekly:
             try:
@@ -804,33 +740,21 @@ if Update and ContextTypes:
                 ema20x50_short = (current_ema20 < current_ema50) and (current_price < current_ema20)
                 price_change   = (current_price / df['close'].iloc[-2] - 1) if len(df) > 1 else 0
 
-                # SMA30 Weekly
                 price_above_sma30 = False
                 if wdf is not None and not wdf.empty and len(wdf) >= 30:
                     wdf = wdf.copy()
                     wdf['SMA30'] = wdf['close'].rolling(window=30).mean()
                     weekly_sma30 = wdf['SMA30'].iloc[-1]
-                    weekly_price = wdf['close'].iloc[-1]
-                    price_above_sma30 = (weekly_price > weekly_sma30) if pd.notna(weekly_sma30) else False
+                    price_above_sma30 = (wdf['close'].iloc[-1] > weekly_sma30) if pd.notna(weekly_sma30) else False
 
-                # Money Flow A/D
                 money_df = calculate_money_ad(df)
                 ad_delta = money_df['money_ad'].iloc[-1] - money_df['money_ad'].iloc[-11]
                 money_flow_icon = "🟢" if ad_delta > 0 else "🔴"
                 money_flow_str  = f"{ad_delta/1_000_000:+.0f}M"
 
-                rows.append((
-                    ticker,
-                    current_price,
-                    price_change,
-                    ratio,
-                    ema20x50_long,
-                    ema20x50_short,
-                    price_above_sma30,
-                    money_flow_icon,
-                    money_flow_str,
-                ))
-
+                rows.append((ticker, current_price, price_change, ratio,
+                             ema20x50_long, ema20x50_short, price_above_sma30,
+                             money_flow_icon, money_flow_str))
             except Exception as e:
                 print(f"[high_volume] calc error {ticker}: {e}")
                 continue
@@ -841,327 +765,265 @@ if Update and ContextTypes:
         if not rows:
             await update.message.reply_text("📊 Акций с повышенным объёмом не найдено")
             return
-        
-        msg = "📊 <b>Акции с повышенным объёмом</b>\n\n"
+
+        msg  = "📊 <b>Акции с повышенным объёмом</b>\n\n"
         msg += "<pre>"
         msg += f"{'Тикер':<6} {'Цена':>8} {'Δ Цены':>7} {'Объём':>6} {'ema20x50':>6} {'sma30':>6} {'Δ Потока':>10}\n"
         msg += "-" * 60 + "\n"
-        
         for ticker, price, delta, ratio, ema20x50_long, ema20x50_short, sma_signal, mf_icon, mf_str in rows:
             ema_icon = "🟢" if ema20x50_long else ("🔴" if ema20x50_short else "⚫")
             sma_icon = "🟢" if sma_signal else "🔴"
-            
             msg += f"{ticker:<6} {price:>8.2f} {delta*100:>6.1f}% {ratio:>5.1f}x {ema_icon:>6} {sma_icon:>4} {mf_icon}{mf_str:>6}\n"
-        
         msg += "</pre>\n\n"
         msg += "<i>EMA - пересечение EMA20x50 (D) на дневном ТФ</i>\n"
         msg += "<i>SMA - цена выше SMA30 на недельном ТФ</i>\n"
         msg += "<i>Δ Потока - приток/отток денежных средств (посл. 10 дней)</i>"
-        
         await update.message.reply_text(msg, parse_mode="HTML")
 
 async def cross_ema200(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу пересечения цены и EMA200 за последние 50 дней...")
-    long_hits, short_hits = [], []
-    today = datetime.today().date()
-    
-    for ticker in sum(SECTORS.values(), []):
+    await update.message.reply_text("🔍 Ищу пересечения цены и EMA200 за последние 50 дней…")
+    all_tickers = sum(SECTORS.values(), [])
+
+    async def _fetch(ticker: str):
         try:
-            df = get_moex_data(ticker, days=350)
-            if df.empty or len(df) < 200:
-                continue
-
-            # Расчёт EMA200
-            df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
-
-            recent = df.tail(51)
-            ema200 = recent['EMA200']
-            close = recent['close']
-
-            prev_close = close.shift(1)
-            prev_ema200 = ema200.shift(1)
-
-            current_close = df['close'].iloc[-1]
-            current_ema200 = df['EMA200'].iloc[-1]
-
-            last_signal = None
-            last_date = None
-
-            # Векторизация пересечений
-            cross_up = (prev_close <= prev_ema200) & (close > ema200)
-            confirmed_up = cross_up & (close > ema200) & (current_close > current_ema200)
-
-            cross_down = (prev_close >= prev_ema200) & (close < ema200)
-            confirmed_down = cross_down & (close < ema200) & (current_close < current_ema200)
-
-            # Берём последнее пересечение
-            if confirmed_up.any():
-                last_signal = 'long'
-                last_date = confirmed_up[confirmed_up].index[-1].strftime('%d.%m.%Y')
-
-            elif confirmed_down.any():
-                last_signal = 'short'
-                last_date = confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y')
-
-            # Добавляем в списки
-            if last_signal == 'long':
-                long_hits.append((ticker, last_date))
-            elif last_signal == 'short':
-                short_hits.append((ticker, last_date))
-
+            return ticker, await async_get_moex_data(ticker, days=350)
         except Exception as e:
             print(f"Ошибка EMA200 для {ticker}: {e}")
+            return ticker, None
+
+    results = await asyncio.gather(*[_fetch(t) for t in all_tickers])
+
+    long_hits, short_hits = [], []
+    for ticker, df in results:
+        try:
+            if df is None or df.empty or len(df) < 200:
+                continue
+
+            df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
+            recent = df.tail(51)
+            ema200 = recent['EMA200']
+            close  = recent['close']
+
+            prev_close  = close.shift(1)
+            prev_ema200 = ema200.shift(1)
+
+            current_close  = df['close'].iloc[-1]
+            current_ema200 = df['EMA200'].iloc[-1]
+
+            cross_up   = (prev_close <= prev_ema200) & (close > ema200)
+            cross_down = (prev_close >= prev_ema200) & (close < ema200)
+
+            confirmed_up   = cross_up   & (close > ema200) & (current_close > current_ema200)
+            confirmed_down = cross_down & (close < ema200) & (current_close < current_ema200)
+
+            if confirmed_up.any():
+                long_hits.append((ticker, confirmed_up[confirmed_up].index[-1].strftime('%d.%m.%Y')))
+            elif confirmed_down.any():
+                short_hits.append((ticker, confirmed_down[confirmed_down].index[-1].strftime('%d.%m.%Y')))
+
+        except Exception as e:
+            print(f"Ошибка EMA200 calc для {ticker}: {e}")
             continue
 
-    # Сортировка по дате (новые вверх)
-    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+    long_hits.sort(key=lambda x:  datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
     short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
 
-    # Формируем сообщение
     msg = ""
     if long_hits:
         msg += f"🟢 *Лонг пересечение цены с EMA200 за последние 50 дней, всего: {len(long_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
     else:
         msg += "🟢 *Лонг сигналов не найдено за последние 50 дней*\n\n"
-        
+
     if short_hits:
         msg += f"🔴 *Шорт пересечение цены с EMA200 за последние 50 дней, всего: {len(short_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in short_hits) + "\n\n"
     else:
         msg += "🔴 *Шорт сигналов не найдено за последние 50 дней*\n\n"
-    
+
     if long_hits or short_hits:
-        tickers_summary = []
+        parts = []
         if long_hits:
-            long_tickers = ", ".join(t for t, _ in long_hits)
-            tickers_summary.append(f"*Лонг:* {long_tickers}")
+            parts.append(f"*Лонг:* " + ", ".join(t for t, _ in long_hits))
         if short_hits:
-            short_tickers = ", ".join(t for t, _ in short_hits)
-            tickers_summary.append(f"\n*Шорт:* {short_tickers}")
-        msg += "\n" + "\n".join(tickers_summary)
+            parts.append(f"\n*Шорт:* " + ", ".join(t for t, _ in short_hits))
+        msg += "\n" + "\n".join(parts)
 
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 50 дней...")
-    long_hits, short_hits = [], []
-    today = datetime.today().date()
-    
-    for ticker in sum(SECTORS.values(), []):
+    await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 50 дней…")
+    all_tickers = sum(SECTORS.values(), [])
+
+    async def _fetch(ticker: str):
         try:
-            df = get_moex_data(ticker, days=100)
-            if df.empty or len(df) < 100:
+            return ticker, await async_get_moex_data(ticker, days=100)
+        except Exception as e:
+            print(f"Ошибка EMA для {ticker}: {e}")
+            return ticker, None
+
+    results = await asyncio.gather(*[_fetch(t) for t in all_tickers])
+
+    long_hits, short_hits = [], []
+    for ticker, df in results:
+        try:
+            if df is None or df.empty or len(df) < 100:
                 continue
 
-            # Расчёт EMA
             df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
 
-            recent = df.tail(51)  # последние 50 дней + предыдущий бар для сдвига
+            recent = df.tail(51)
             ema20 = recent['EMA20']
             ema50 = recent['EMA50']
-            close = recent['close']
 
             prev_ema20 = ema20.shift(1)
             prev_ema50 = ema50.shift(1)
 
-            current_close = df['close'].iloc[-1]
-            current_ema20 = df['EMA20'].iloc[-1]
-            current_ema50 = df['EMA50'].iloc[-1]
+            current_close  = df['close'].iloc[-1]
+            current_ema20  = df['EMA20'].iloc[-1]
+            current_ema50  = df['EMA50'].iloc[-1]
 
-            # Векторизация пересечений на recent
-            cross_up = (prev_ema20 <= prev_ema50) & (ema20 > ema50)
+            cross_up   = (prev_ema20 <= prev_ema50) & (ema20 > ema50)
             cross_down = (prev_ema20 >= prev_ema50) & (ema20 < ema50)
 
-            # Получаем последние даты пересечений, если они есть
-            last_up_idx = cross_up[cross_up].index[-1] if cross_up.any() else None
+            last_up_idx   = cross_up[cross_up].index[-1]   if cross_up.any()   else None
             last_down_idx = cross_down[cross_down].index[-1] if cross_down.any() else None
 
-            # Выбираем, какое пересечение было ПОСЛЕДНИМ
-            chosen_signal = None
-            chosen_date = None
+            chosen_signal, chosen_date = None, None
+            if last_up_idx and last_down_idx:
+                chosen_signal = 'long'  if last_up_idx > last_down_idx else 'short'
+                chosen_date   = last_up_idx if last_up_idx > last_down_idx else last_down_idx
+            elif last_up_idx:
+                chosen_signal, chosen_date = 'long',  last_up_idx
+            elif last_down_idx:
+                chosen_signal, chosen_date = 'short', last_down_idx
 
-            if last_up_idx is not None and last_down_idx is not None:
-                if last_up_idx > last_down_idx:
-                    chosen_signal = 'long'
-                    chosen_date = last_up_idx
-                else:
-                    chosen_signal = 'short'
-                    chosen_date = last_down_idx
-            elif last_up_idx is not None:
-                chosen_signal = 'long'
-                chosen_date = last_up_idx
-            elif last_down_idx is not None:
-                chosen_signal = 'short'
-                chosen_date = last_down_idx
-
-            # Если пересечение найдено — классифицируем по текущему положению цены/EMA
-            if chosen_signal is not None:
+            if chosen_signal:
                 last_date_str = chosen_date.strftime('%d.%m.%Y')
-
                 if chosen_signal == 'long':
-                    # 🟢 если цена > EMA20 и EMA20 > EMA50, иначе 🟠
-                    if (current_close > current_ema20) and (current_ema20 > current_ema50):
-                        mark = "🟢"
-                    else:
-                        mark = "🟠"
+                    mark = "🟢" if (current_close > current_ema20) and (current_ema20 > current_ema50) else "🟠"
                     long_hits.append((f"{mark} {ticker}", last_date_str))
-
-                elif chosen_signal == 'short':
-                    # 🔴 если цена < EMA20 и EMA20 < EMA50, иначе 🟠
-                    if (current_close < current_ema20) and (current_ema20 < current_ema50):
-                        mark = "🔴"
-                    else:
-                        mark = "🟠"
+                else:
+                    mark = "🔴" if (current_close < current_ema20) and (current_ema20 < current_ema50) else "🟠"
                     short_hits.append((f"{mark} {ticker}", last_date_str))
 
         except Exception as e:
-            print(f"Ошибка EMA для {ticker}: {e}")
+            print(f"Ошибка EMA calc для {ticker}: {e}")
             continue
 
-    # Сортировка по дате (новые вверх)
-    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'),  reverse=True)
     short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
-    
-    # Формируем сообщение
+
     msg = ""
     if long_hits:
         msg += f"🟢 *Лонг пересечение EMA20×50 за последние 50 дней, всего: {len(long_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
     else:
         msg += "🟢 *Лонг сигналов не найдено за последние 50 дней*\n\n"
-        
+
     if short_hits:
         msg += f"🔴 *Шорт пересечение EMA20×50 за последние 50 дней, всего: {len(short_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in short_hits) + "\n\n"
     else:
         msg += "🔴 *Шорт сигналов не найдено за последние 50 дней*\n\n"
 
-    # Добавляем итоговый список тикеров внизу
     if long_hits or short_hits:
-        tickers_summary = []
+        parts = []
         if long_hits:
-            long_tickers = ", ".join(t.split()[1] for t, _ in long_hits)
-            tickers_summary.append(f"*Лонг:* {long_tickers}")
+            parts.append(f"*Лонг:* " + ", ".join(t.split()[1] for t, _ in long_hits))
         if short_hits:
-            short_tickers = ", ".join(t.split()[1] for t, _ in short_hits)
-            tickers_summary.append(f"\n*Шорт:* {short_tickers}")
-        msg += "\n" + "\n".join(tickers_summary)
+            parts.append(f"\n*Шорт:* " + ", ".join(t.split()[1] for t, _ in short_hits))
+        msg += "\n" + "\n".join(parts)
 
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 
 
 async def cross_ema9x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Ищу пересечения EMA9 и EMA50 за последние 50 дней...")
-    long_hits, short_hits = [], []
-    today = datetime.today().date()
-    
-    for ticker in sum(SECTORS.values(), []):
+    await update.message.reply_text("🔍 Ищу пересечения EMA9 и EMA50 за последние 50 дней…")
+    all_tickers = sum(SECTORS.values(), [])
+
+    async def _fetch(ticker: str):
         try:
-            df = get_moex_data(ticker, days=100)
-            if df.empty or len(df) < 100:
+            return ticker, await async_get_moex_data(ticker, days=100)
+        except Exception as e:
+            print(f"Ошибка EMA9x50 для {ticker}: {e}")
+            return ticker, None
+
+    results = await asyncio.gather(*[_fetch(t) for t in all_tickers])
+
+    long_hits, short_hits = [], []
+    for ticker, df in results:
+        try:
+            if df is None or df.empty or len(df) < 100:
                 continue
 
-            # Расчёт EMA
-            df['EMA9'] = df['close'].ewm(span=9, adjust=False).mean()
+            df['EMA9']  = df['close'].ewm(span=9,  adjust=False).mean()
             df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
 
-            recent = df.tail(51)  # последние 50 дней + предыдущий бар для сдвига
-            ema9 = recent['EMA9']
+            recent = df.tail(51)
+            ema9  = recent['EMA9']
             ema50 = recent['EMA50']
-            close = recent['close']
 
-            prev_ema9 = ema9.shift(1)
+            prev_ema9  = ema9.shift(1)
             prev_ema50 = ema50.shift(1)
 
             current_close = df['close'].iloc[-1]
-            current_ema9 = df['EMA9'].iloc[-1]
+            current_ema9  = df['EMA9'].iloc[-1]
             current_ema50 = df['EMA50'].iloc[-1]
 
-            # Векторизация пересечений на recent
-            cross_up = (prev_ema9 <= prev_ema50) & (ema9 > ema50)
+            cross_up   = (prev_ema9 <= prev_ema50) & (ema9 > ema50)
             cross_down = (prev_ema9 >= prev_ema50) & (ema9 < ema50)
 
-            # Получаем последние даты пересечений, если они есть
-            last_up_idx = cross_up[cross_up].index[-1] if cross_up.any() else None
+            last_up_idx   = cross_up[cross_up].index[-1]   if cross_up.any()   else None
             last_down_idx = cross_down[cross_down].index[-1] if cross_down.any() else None
 
-            # Выбираем, какое пересечение было ПОСЛЕДНИМ
-            chosen_signal = None
-            chosen_date = None
+            chosen_signal, chosen_date = None, None
+            if last_up_idx and last_down_idx:
+                chosen_signal = 'long'  if last_up_idx > last_down_idx else 'short'
+                chosen_date   = last_up_idx if last_up_idx > last_down_idx else last_down_idx
+            elif last_up_idx:
+                chosen_signal, chosen_date = 'long',  last_up_idx
+            elif last_down_idx:
+                chosen_signal, chosen_date = 'short', last_down_idx
 
-            if last_up_idx is not None and last_down_idx is not None:
-                # сравниваем даты
-                if last_up_idx > last_down_idx:
-                    chosen_signal = 'long'
-                    chosen_date = last_up_idx
-                else:
-                    chosen_signal = 'short'
-                    chosen_date = last_down_idx
-            elif last_up_idx is not None:
-                chosen_signal = 'long'
-                chosen_date = last_up_idx
-            elif last_down_idx is not None:
-                chosen_signal = 'short'
-                chosen_date = last_down_idx
-            else:
-                chosen_signal = None
-
-            # Если пересечение найдено — классифицируем по текущему положению цены/EMA
-            if chosen_signal is not None:
+            if chosen_signal:
                 last_date_str = chosen_date.strftime('%d.%m.%Y')
-
                 if chosen_signal == 'long':
-                    # метка: 🟢 если цена > EMA9 и EMA9 > EMA50
-                    if (current_close > current_ema9) and (current_ema9 > current_ema50):
-                        mark = "🟢"
-                    else:
-                        # EMA9 выше EMA50 (после пересечения), но цена не выше EMA9
-                        # либо EMA9 уже опустилась ниже EMA50 — всё равно помечаем как 🟠 в остальных случаях
-                        mark = "🟠"
+                    mark = "🟢" if (current_close > current_ema9) and (current_ema9 > current_ema50) else "🟠"
                     long_hits.append((f"{mark} {ticker}", last_date_str))
-
-                elif chosen_signal == 'short':
-                    if (current_close < current_ema9) and (current_ema9 < current_ema50):
-                        mark = "🔴"
-                    else:
-                        mark = "🟠"
+                else:
+                    mark = "🔴" if (current_close < current_ema9) and (current_ema9 < current_ema50) else "🟠"
                     short_hits.append((f"{mark} {ticker}", last_date_str))
 
         except Exception as e:
-            print(f"Ошибка EMA для {ticker}: {e}")
+            print(f"Ошибка EMA9x50 calc для {ticker}: {e}")
             continue
 
-    # Сортировка по дате (новые вверх)
-    long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
+    long_hits.sort(key=lambda x:  datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
     short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y'), reverse=True)
-    
-    # Формируем сообщение
+
     msg = ""
     if long_hits:
         msg += f"🟢 *Лонг пересечения EMA9×50 за последние 50 дней, всего: {len(long_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in long_hits) + "\n\n"
     else:
         msg += "🟢 *Лонг сигналов не найдено за последние 50 дней*\n\n"
-        
+
     if short_hits:
         msg += f"🔴 *Шорт пересечения EMA9×50 за последние 50 дней, всего: {len(short_hits)}:*\n"
         msg += "\n".join(f"{t} {d}" for t, d in short_hits) + "\n\n"
     else:
         msg += "🔴 *Шорт сигналов не найдено за последние 50 дней*\n\n"
 
-    # Добавляем итоговый список тикеров внизу
     if long_hits or short_hits:
-        tickers_summary = []
+        parts = []
         if long_hits:
-            long_tickers = ", ".join(t.split()[1] for t, _ in long_hits)
-            tickers_summary.append(f"*Лонг:* {long_tickers}")
+            parts.append(f"*Лонг:* " + ", ".join(t.split()[1] for t, _ in long_hits))
         if short_hits:
-            short_tickers = ", ".join(t.split()[1] for t, _ in short_hits)
-            tickers_summary.append(f"\n*Шорт:* {short_tickers}")
-        msg += "\n" + "\n".join(tickers_summary)
+            parts.append(f"\n*Шорт:* " + ", ".join(t.split()[1] for t, _ in short_hits))
+        msg += "\n" + "\n".join(parts)
 
     await update.message.reply_text(msg, parse_mode="Markdown")
 
@@ -1899,15 +1761,13 @@ if Update and ContextTypes:
     
     async def stan_recent_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30… (параллельный режим)")
-
         all_tickers = sum(SECTORS.values(), [])
         weeks = 5
 
-        # ── Волна 1: все недельные данные параллельно ─────────────────────────
+        # Волна 1: все недельные параллельно
         async def _fetch_weekly(ticker: str):
             try:
-                wdf = await async_get_moex_weekly_data(ticker, weeks=60)
-                return ticker, wdf
+                return ticker, await async_get_moex_weekly_data(ticker, weeks=60)
             except Exception as e:
                 print(f"[stan_recent_week] weekly error {ticker}: {e}")
                 return ticker, None
@@ -1915,7 +1775,7 @@ if Update and ContextTypes:
         weekly_results = await asyncio.gather(*[_fetch_weekly(t) for t in all_tickers])
         weekly_map = {t: wdf for t, wdf in weekly_results}
 
-        # ── Быстрый фильтр в памяти: цена > SMA30 и есть crossover ───────────
+        # Быстрый фильтр в памяти: цена > SMA30 и есть crossover
         weekly_candidates = []
         for ticker, wdf in weekly_map.items():
             if wdf is None or wdf.empty or len(wdf) < 35:
@@ -1934,11 +1794,10 @@ if Update and ContextTypes:
             if crossed:
                 weekly_candidates.append(ticker)
 
-        # ── Волна 2: дневные данные только для кандидатов (фильтр оборота) ────
+        # Волна 2: дневные только для кандидатов (фильтр оборота)
         async def _fetch_daily(ticker: str):
             try:
-                dfd = await async_get_moex_data(ticker, days=20)
-                return ticker, dfd
+                return ticker, await async_get_moex_data(ticker, days=20)
             except Exception as e:
                 print(f"[stan_recent_week] daily error {ticker}: {e}")
                 return ticker, None
@@ -1946,7 +1805,6 @@ if Update and ContextTypes:
         daily_results = await asyncio.gather(*[_fetch_daily(t) for t in weekly_candidates])
         daily_map = {t: dfd for t, dfd in daily_results}
 
-        # ── Финальная проверка: оборот >= 50 млн + точная дата crossover ──────
         crossovers = []
         for ticker in weekly_candidates:
             try:
@@ -1955,7 +1813,6 @@ if Update and ContextTypes:
                     continue
                 if (dfd['volume'].iloc[-10:] * dfd['close'].iloc[-10:]).mean() < 50_000_000:
                     continue
-
                 wdf_copy = weekly_map[ticker].copy()
                 wdf_copy['SMA30'] = wdf_copy['close'].rolling(window=30).mean()
                 recent = wdf_copy.tail(weeks + 1)
@@ -1976,12 +1833,10 @@ if Update and ContextTypes:
             return
 
         crossovers.sort(key=lambda x: x[1], reverse=True)
-
         result_text = "📈 Акции с пересечением цены через SMA30 снизу вверх за последние 5 недель:\n\n"
         for ticker, date in crossovers:
             result_text += f"{ticker} {date.strftime('%d.%m.%Y')}\n"
         result_text += f"\n🔢 Всего найдено: {len(crossovers)} акций"
-
         await update.message.reply_text(result_text)
 
     
