@@ -2095,27 +2095,30 @@ if __name__ == '__main__':
 
     # Создаём приложение
     app = (
-    ApplicationBuilder()
-    .token(TOKEN)
-    .concurrent_updates(False)
-    .build()
+        ApplicationBuilder()
+        .token(TOKEN)
+        .concurrent_updates(True)
+        .build()
     )
-
+    
     # === Добавляем хендлеры ===
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("chart_hv", chart_hv))
-    app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50))
+    
+    # ДОЛГИЕ КОМАНДЫ — обязательно block=False
+    app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50, block=False))
     app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
-    app.add_handler(CommandHandler("cross_ema9x50", cross_ema9x50))
-    app.add_handler(CommandHandler("cross_ema200", cross_ema200))
-    app.add_handler(CommandHandler("stan", stan))
-    app.add_handler(CommandHandler("stan_recent", stan_recent))
-    app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short))
-    app.add_handler(CommandHandler("stan_recent_week", stan_recent_week))
-    app.add_handler(CommandHandler("long_moneyflow", long_moneyflow))
-    app.add_handler(CommandHandler("high_volume", high_volume))
-    app.add_handler(CommandHandler("rsi_top", rsi_top))
-    #app.add_handler(CommandHandler("cache_debug", cache_debug))
+    app.add_handler(CommandHandler("cross_ema9x50", cross_ema9x50, block=False))
+    app.add_handler(CommandHandler("cross_ema200", cross_ema200, block=False))
+    app.add_handler(CommandHandler("stan", stan, block=False))
+    app.add_handler(CommandHandler("stan_recent", stan_recent, block=False))
+    app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short, block=False))
+    app.add_handler(CommandHandler("stan_recent_week", stan_recent_week, block=False))
+    app.add_handler(CommandHandler("long_moneyflow", long_moneyflow, block=False))
+    app.add_handler(CommandHandler("high_volume", high_volume, block=False))
+    app.add_handler(CommandHandler("rsi_top", rsi_top, block=False))
+
+    # app.add_handler(CommandHandler("cache_debug", cache_debug))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     # Хендлеры с диалогами
