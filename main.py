@@ -16,8 +16,6 @@ import html
 import concurrent.futures
 
 
-
-
 # Активация Токена Tinkoff
 from t_tech.invest import Client, CandleInterval
 
@@ -41,7 +39,6 @@ def set_webhook():
         print("Webhook установлен успешно!")
     else:
         print(f"Ошибка при установке webhook: {response.text}")
-
 
 
 if __name__ == "__main__":
@@ -75,20 +72,6 @@ SECTORS = {
     "Машиностроение": ["UWGN", "SVAV", "KMAZ", "UNAC", "IRKT", "VSMO"]
 }
 
-SECTORS1 = {
-    "Финансы": ["SBER", "T", "VTBR", "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS", "DOMRF"],
-    "Нефтегаз": ["GAZP", "NVTK", "LKOH", "ROSN", "TATNP", "TATN", "SNGS", "SNGSP", "BANE", "BANEP", "RNFT"],
-    "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP", "MTLR", "PLZL", "SGZH"],
-    "IT": ["YDEX", "DATA", "HEAD", "POSI", "VKCO", "ASTR", "DELI", "WUSH", "CNRU", "DIAS"],
-    "Телеком": ["MTSS", "RTKMP", "RTKM"],
-    "Строители": ["SMLT", "PIKK", "ETLN", "GLRX"],
-    "Ритейл": ["X5", "MGNT", "LENT", "BELU", "OZON", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID"],
-    "Электро": ["IRAO", "UPRO", "LSNGP", "MRKP"],
-    "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
-    "Агро": ["PHOR", "RAGR"],
-    "Медицина": ["MDMG", "OZPH", "PRMD"],
-    "Машиностроение": ["UWGN", "SVAV"]
-}
 
 TICKERS_PER_PAGE = 10
 
@@ -111,34 +94,7 @@ def load_figi_cache_from_file():
 
 # Загружаем figi_cache из файла
 figi_cache = load_figi_cache_from_file()
-"""
-async def cache_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    #Отладочная команда для проверки кэша
-    try:
-        if 'caching' in globals():
-            stats = caching.get_cache_stats()
-            msg = f"🔍 **Отладка кэширования:**\n\n"
-            msg += f"📊 Статистика:\n"
-            #msg += f"• MOEX кэш: {stats['moex_entries']} записей\n"
-            #msg += f"• Weekly кэш: {stats['weekly_entries']} записей\n"
-            msg += f"• FIGI кэш: {stats['figi_entries']} записей\n"
-            msg += f"• Общий размер: {stats['size_mb']} MB\n\n"
-            
-            # Проверяем, заменены ли функции
-            import sys
-            if 'main' in sys.modules:
-                main_module = sys.modules['main']
-                msg += f"🔧 Замена функций:\n"
-                #msg += f"• get_moex_data: {'✅' if hasattr(main_module, '_original_get_moex_data') else '❌'}\n"
-                #msg += f"• get_moex_weekly_data: {'✅' if hasattr(main_module, '_original_get_moex_weekly_data') else '❌'}\n"
-                msg += f"• get_figi_by_ticker: {'✅' if hasattr(main_module, '_original_get_figi_by_ticker') else '❌'}\n"
-        else:
-            msg = "❌ Модуль caching не загружен"
-            
-        await update.message.reply_text(msg, parse_mode="Markdown")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка отладки: {e}")
-"""
+
 
 # === ФУНКЦИИ ПОЛУЧЕНИЯ ДАННЫХ ===
 
@@ -461,47 +417,12 @@ def analyze_indicators(df):
     df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
     return df
 
-# === ФУНКЦИИ ПОИСКА ПАТТЕРНОВ ===
 
-def find_levels(df):
-    """Поиск уровней поддержки и сопротивления"""
-    if df.empty:
-        return []
-    
-    levels = []
-    closes = df['close'].values
-    local_max = argrelextrema(closes, np.greater)[0]
-    local_min = argrelextrema(closes, np.less)[0]
-
-    extrema = sorted([(i, closes[i]) for i in np.concatenate((local_max, local_min))], key=lambda x: x[1])
-    if len(extrema) > 0:
-        grouped = pd.Series([round(p[1], 1) for p in extrema]).value_counts()
-        strong_levels = grouped[grouped > 1].index.tolist()
-        for level in strong_levels:
-            for i, val in extrema:
-                if abs(val - level) < 0.5:
-                    levels.append((df.index[i], val))
-                    break
-    return levels
-
-def detect_double_patterns(df):
-    """Обнаружение двойных вершин и дна"""
-    if df.empty or len(df) < 5:
-        return []
-    
-    closes = df['close'].values
-    patterns = []
-    for i in range(2, len(closes) - 2):
-        if closes[i-2] < closes[i-1] < closes[i] and closes[i] > closes[i+1] > closes[i+2]:
-            patterns.append(('Double Top', df.index[i], closes[i]))
-        if closes[i-2] > closes[i-1] > closes[i] and closes[i] < closes[i+1] < closes[i+2]:
-            patterns.append(('Double Bottom', df.index[i], closes[i]))
-    return patterns
 
 # === ФУНКЦИИ ПОСТРОЕНИЯ ГРАФИКОВ ===
 
 def plot_stock(df, ticker, levels=[], patterns=[]):
-    """Построение графика акции с техническим анализом"""
+    #Построение графика акции с техническим анализом
     if df.empty:
         return None
     
@@ -554,39 +475,11 @@ def plot_stock(df, ticker, levels=[], patterns=[]):
         plt.close()
         return None
 
-def plot_stan_chart(df, ticker):
-    """Построение графика по методу Вайнштейна"""
-    if df.empty:
-        return None
-    
-    try:
-        df['SMA30'] = df['close'].rolling(window=30).mean()
-        df['Upper'] = df['SMA30'] + 2 * df['close'].rolling(window=30).std()
-        df['Lower'] = df['SMA30'] - 2 * df['close'].rolling(window=30).std()
-
-        plt.figure(figsize=(12, 6))
-        plt.plot(df.index, df['close'], label='Цена', color='blue')
-        plt.plot(df.index, df['SMA30'], label='SMA 30', linewidth=2.5, color='black')
-        plt.plot(df.index, df['Upper'], label='BB верх', linestyle='--', color='gray')
-        plt.plot(df.index, df['Lower'], label='BB низ', linestyle='--', color='gray')
-
-        plt.title(f"Вайнштейн: {ticker} на 1W ТФ")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        filename = f"{ticker}_stan.png"
-        plt.savefig(filename)
-        plt.close()
-        return filename
-    except Exception as e:
-        print(f"Ошибка построения графика для {ticker}: {e}")
-        plt.close()
-        return None
 
 # === ФУНКЦИИ ПОИСКА ПЕРЕСЕЧЕНИЙ ===
 
 def find_sma30_crossover(ticker, days=7):
-    """Находит пересечение цены снизу вверх через SMA30"""
+    #Находит пересечение цены снизу вверх через SMA30
     try:
         df = get_moex_data(ticker, days=60)
         if df.empty or len(df) < 35:
@@ -627,7 +520,7 @@ def find_sma30_crossover(ticker, days=7):
         return None
 
 def find_sma30_crossover_short(ticker, days=7):
-    """Находит пересечение цены сверху вниз через SMA30"""
+    #Находит пересечение цены сверху вниз через SMA30
     try:
         df = get_moex_data(ticker, days=60)
         if df.empty or len(df) < 35:
@@ -668,7 +561,7 @@ def find_sma30_crossover_short(ticker, days=7):
         return None
 
 def find_sma30_crossover_week(ticker, weeks=5):
-    """Находит пересечение цены снизу вверх через SMA30 на недельном ТФ"""
+    #Находит пересечение цены снизу вверх через SMA30 на недельном ТФ
     try:
         df = get_moex_weekly_data(ticker, weeks=60)
         if df.empty or len(df) < 35:
@@ -716,27 +609,9 @@ def find_sma30_crossover_week(ticker, weeks=5):
 
 if Update and ContextTypes:
     
-    # Функция для получения статистики кэша
-#    def get_cache_stats():
-        #Возвращает статистику кэша если модуль загружен
-#        try:
-#            if 'caching' in globals():
- #               return caching.get_cache_stats()
-  #          else:
-  #              return {'entries': 0, 'size_mb': 0, 'status': 'disabled'}
-  #      except:
-   #         return {'entries': 0, 'size_mb': 0, 'status': 'error'}
     
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        # Закомментированный код кэша
-        # cache_stats = get_cache_stats()
-        # if cache_stats.get('status') == 'disabled':
-        #     cache_info = "🔄 Кэширование отключено\n"
-        # elif cache_stats.get('status') == 'error':
-        #     cache_info = "⚠️ Ошибка кэширования\n"
-        # else:
-        #     cache_info = f"📊 Кэш: {cache_stats.get('entries', 0)} записей, {cache_stats.get('size_mb', 0)} MB\n"
-        
+
         text = (
             "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
             #f"{cache_info}"
@@ -823,9 +698,6 @@ if Update and ContextTypes:
         keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
         await update.message.reply_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-    async def stan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        keyboard = [[InlineKeyboardButton(sector, callback_data=f"stan_sector:{sector}:0")] for sector in SECTORS]
-        await update.message.reply_text("Выберите отрасль для анализа по Штейну:", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔍 Ищу акции с повышенным объёмом…")
@@ -1362,9 +1234,9 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def process_single_ticker(ticker: str):
-    """
-    Обрабатывает один тикер и возвращает найденные сигналы с цветными статусами для вывода
-    """
+    
+   # Обрабатывает один тикер и возвращает найденные сигналы с цветными статусами для вывода
+    
     try:
         # Получаем данные (async с переносом в поток для синхронной функции)
         df = await asyncio.to_thread(get_moex_data_4h_tinkoff, ticker, 50)
@@ -1446,7 +1318,7 @@ async def process_single_ticker(ticker: str):
 
 
 async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получает количество дней и выполняет расчет дельты"""
+    #Получает количество дней и выполняет расчет дельты
     try:
         days = int(update.message.text)
         if not (1 <= days <= 100):
@@ -1475,7 +1347,7 @@ async def receive_delta_days(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 #/DELTA
 async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_TYPE, ticker: str, days: int):
-    """Расчет дельты + график"""
+    #Расчет дельты + график
     chat_id = update.effective_chat.id
     await update.message.reply_text(f"🔍 Рассчитываю дельту денежного потока для {ticker} за {days} дней с графиком...")
 
@@ -1630,9 +1502,9 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
 
 # RSI TOP с Стохастиком
 async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Команда для показа топ перекупленных и топ перепроданных акций по RSI с добавлением Стохастика
-    """
+    
+    #Команда для показа топ перекупленных и топ перепроданных акций по RSI с добавлением Стохастика
+    
     await update.message.reply_text("🔍 Анализирую RSI и Стохастик всех акций. Это может занять некоторое время...")
     
     overbought_stocks = []  # RSI > 70
@@ -1996,25 +1868,7 @@ if Update and ContextTypes:
         
         await update.message.reply_text(result_text)
 
-    # В конце файла, после всех функций, но перед if __name__ == '__main__':
     
-    # === ИНТЕГРАЦИЯ КЭШИРОВАНИЯ ===
-  #  try:
- #       import caching
-  #      print("✅ Модуль кэширования загружен успешно")
-   #     
-    #    if hasattr(caching, 'activate_caching_if_enabled'):
-     #       success = caching.activate_caching_if_enabled()
-      #      if success:
-       #         print("🎯 Кэширование активировано")
-        #    else:
-         #       print("⚠️ Кэширование не активировано")
-    
- #   except ImportError:
-  #      print("ℹ️ Модуль кэширования не найден, работаем без кэша")
-
-
-
     # Обработчики callback
     async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -2056,8 +1910,7 @@ if Update and ContextTypes:
                     return
 
                 df = analyze_indicators(df)
-                levels = find_levels(df)
-                patterns = detect_double_patterns(df)
+
                 chart = plot_stock(df, ticker, levels, patterns)
                 
                 if chart is None:
@@ -2110,7 +1963,6 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
     app.add_handler(CommandHandler("cross_ema9x50", cross_ema9x50, block=False))
     app.add_handler(CommandHandler("cross_ema200", cross_ema200, block=False))
-    app.add_handler(CommandHandler("stan", stan, block=False))
     app.add_handler(CommandHandler("stan_recent", stan_recent, block=False))
     app.add_handler(CommandHandler("stan_recent_d_short", stan_recent_d_short, block=False))
     app.add_handler(CommandHandler("stan_recent_week", stan_recent_week, block=False))
