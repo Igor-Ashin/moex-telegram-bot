@@ -1013,13 +1013,20 @@ async def cross_ema9x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Защита от двойного запуска (Telegram повторяет webhook если нет ответа за 60 сек)
+    update_id = update.update_id
+    running = context.bot_data.setdefault("running_4h", set())
+    if update_id in running:
+        print(f"⚠️ cross_ema20x50_4h: дубликат update_id={update_id}, пропускаем")
+        return
+    running.add(update_id)
+
     try:
         await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 25 свечей...")
         print("▶ Запущена команда EMA CROSS")
         
-        # Контроль времени выполнения
         start_time = datetime.now()
-        MAX_EXECUTION_TIME = 1800  # 30 минут
+        MAX_EXECUTION_TIME = 1800
         
         all_tickers = sum(SECTORS.values(), [])
         print(f"🔁 Всего тикеров для обработки: {len(all_tickers)}")
@@ -1027,27 +1034,21 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         long_hits, short_hits = [], []
         processed_count = 0
         
-        # Обрабатываем тикеры с ограничением по времени
         for ticker in all_tickers:
-            # Проверка времени выполнения
             if (datetime.now() - start_time).seconds > MAX_EXECUTION_TIME:
                 print(f"⏰ Превышено максимальное время выполнения ({MAX_EXECUTION_TIME} сек)")
                 break
                 
             try:
                 print(f"🔁 Обрабатываем {ticker} ({processed_count + 1}/{len(all_tickers)})")
-                
-                # Принудительно сбрасываем буфер логов
                 import sys
                 sys.stdout.flush()
                 
-                # Добавляем timeout для каждого тикера
                 print(f"📡 Запрашиваем данные для {ticker}...")
                 
-                # Оборачиваем ВСЮ обработку тикера в timeout
                 ticker_result = await asyncio.wait_for(
                     process_single_ticker(ticker),
-                    timeout=20.0  # 20 секунд на весь тикер
+                    timeout=20.0
                 )
                 
                 if ticker_result:
@@ -1062,7 +1063,6 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 print(f"✅ Завершен анализ для {ticker}")
                 processed_count += 1
                 
-                # Отправляем промежуточное уведомление каждые 20 тикеров
                 if processed_count % 20 == 0:
                     try:
                         progress_msg = f"⏳ Обработано {processed_count}/{len(all_tickers)} тикеров..."
@@ -1071,8 +1071,7 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     except Exception as progress_e:
                         print(f"❌ Ошибка отправки прогресса: {progress_e}")
                 
-                # Небольшая задержка между запросами + принудительный сброс буфера
-                await asyncio.sleep(0.3)  # Увеличиваем задержку для API Tinkoff
+                await asyncio.sleep(0.3)
                 sys.stdout.flush()
                 
             except asyncio.TimeoutError:
@@ -1086,18 +1085,15 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         print(f"✅ Обработано тикеров: {processed_count}/{len(all_tickers)}")
         
-        # Сортировка по дате (новые вверх)
         try:
             long_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
             short_hits.sort(key=lambda x: datetime.strptime(x[1], '%d.%m.%Y %H:%M'), reverse=True)
         except Exception as e:
             print(f"❌ Ошибка сортировки: {e}")
         
-        # Ограничиваем количество результатов
-        long_hits = long_hits[:30]
+        long_hits  = long_hits[:30]
         short_hits = short_hits[:30]
         
-        # Формируем сообщение
         execution_time = (datetime.now() - start_time).seconds
         msg = f"📊 *Анализ завершен* (обработано {processed_count} тикеров за {execution_time} сек)\n\n"
         
@@ -1109,23 +1105,20 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         if short_hits:
             msg += f"🔴 *Шорт пересечение EMA20×50 за последние 25 4Ч свечей, всего: {len(short_hits)}:*\n\n"
-            msg += "\n".join(f"{t} {d}" for t, d in short_hits)+ "\n\n"
+            msg += "\n".join(f"{t} {d}" for t, d in short_hits) + "\n\n"
         else:
             msg += "🔴 *Шорт сигналов не найдено за последние 25 4Ч свечей*\n\n"
-        #msg += "\n"
-        # Добавляем итоговый список тикеров внизу
+
         if long_hits or short_hits:
             tickers_summary = []
             if long_hits:
-                long_tickers = ", ".join(t.split()[-1] for t, _ in long_hits)  # без эмодзи
+                long_tickers = ", ".join(t.split()[-1] for t, _ in long_hits)
                 tickers_summary.append(f"*Лонг:* {long_tickers}")
             if short_hits:
-                short_tickers = ", ".join(t.split()[-1] for t, _ in short_hits)  # без эмодзи
+                short_tickers = ", ".join(t.split()[-1] for t, _ in short_hits)
                 tickers_summary.append(f"\n*Шорт:* {short_tickers}")
             msg += "\n" + "\n".join(tickers_summary)
 
-        
-        # Отправляем результат
         await update.message.reply_text(msg, parse_mode="Markdown")
         print("✅ Команда EMA CROSS завершена успешно")
         
@@ -1138,6 +1131,10 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except:
             print("❌ Не удалось отправить сообщение об ошибке")
+    finally:
+        running.discard(update_id)
+
+
 
 async def process_single_ticker(ticker: str):
     
@@ -1218,7 +1215,6 @@ async def process_single_ticker(ticker: str):
     except Exception as e:
         print(f"❌ Ошибка обработки тикера {ticker}: {e}")
         return None
-
 
 
 
@@ -1906,7 +1902,7 @@ if __name__ == '__main__':
     
     # ДОЛГИЕ КОМАНДЫ — обязательно block=False
     app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50, block=False))
-    app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h))
+    app.add_handler(CommandHandler("cross_ema20x50_4h", cross_ema20x50_4h, block=False))
     app.add_handler(CommandHandler("cross_ema9x50", cross_ema9x50, block=False))
     app.add_handler(CommandHandler("cross_ema200", cross_ema200, block=False))
     app.add_handler(CommandHandler("stan_recent", stan_recent, block=False))
