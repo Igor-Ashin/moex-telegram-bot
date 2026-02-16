@@ -61,14 +61,14 @@ except ModuleNotFoundError:
 
 # Секторы акций
 SECTORS = {
-    "Финансы": ["SBER", "T", "VTBR", "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS", "CARM", "ZAYM", "MGKL", "DOMRF", "JETL"],
+    "Финансы": ["SBER", "T", "VTBR", "MOEX", "SPBE", "RENI", "BSPB", "SVCB", "MBNK", "LEAS", "SFIN", "AFKS", "CARM", "ZAYM", "MGKL", "DOMRF"],
     "Нефтегаз": ["GAZP", "NVTK", "LKOH", "ROSN", "TATNP", "TATN", "SNGS", "SNGSP", "BANE", "BANEP", "RNFT", "SIBN"],
     "Металлы и добыча": ["ALRS", "GMKN", "RUAL", "TRMK", "MAGN", "NLMK", "CHMF", "MTLRP", "MTLR", "RASP", "PLZL", "UGLD", "SGZH" ,"ENPG", "SELG"],
     "IT": ["YDEX", "DATA", "HEAD", "POSI", "VKCO", "ASTR", "IVAT", "DELI", "WUSH", "CNRU", "DIAS", "SOFL", "ELMT", "BAZA"],
     "Телеком": ["MTSS", "RTKMP", "RTKM", "MGTSP"],
     "Строители": ["SMLT", "PIKK", "LSRG", "ETLN", "GLRX"],
     "Ритейл": ["X5", "MGNT", "LENT", "BELU", "OZON", "EUTR", "ABRD", "GCHE", "AQUA", "HNFG", "MVID", "VSEH", "FIXR"],
-    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKU", "MRKC", "MRKP", "MRKS", "MRKV", "MRKY", "MRKZ", "FEES", "HYDR", "ELFV", "MSNG"],
+    "Электро": ["IRAO", "UPRO", "LSNGP", "MSRS", "MRKU", "MRKC", "MRKP", "MRKS", "MRKV", "MRKY", "FEES", "HYDR", "ELFV", "MSNG", "TGKA", "TGKN"],
     "Транспорт и логистика": ["TRNFP", "AFLT", "FESH", "NMTP", "FLOT"],
     "Агро": ["PHOR", "RAGR", "KZOS", "AKRN", "NKHP"],
     "Медицина": ["MDMG", "OZPH", "PRMD", "ABIO", "GEMC"],
