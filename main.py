@@ -1,4 +1,4 @@
-# main.py (moex_stock_bot.py с интеграцией кэширования)
+# main.py 
 
 import matplotlib
 matplotlib.use('Agg')  # Включаем "безголовый" режим для matplotlib
@@ -103,11 +103,21 @@ figi_cache = load_figi_cache_from_file()
 class RateLimiter:
     def __init__(self, rate_per_minute: int = 100):
         self._interval = 60.0 / rate_per_minute
-        self._semaphore = asyncio.Semaphore(8)
         self._last_call: float = 0.0
-        self._lock = asyncio.Lock()
+        # Asyncio-примитивы создаём лениво (при первом вызове),
+        # чтобы не привязываться к loop'у до его запуска
+        self._semaphore: asyncio.Semaphore | None = None
+        self._lock: asyncio.Lock | None = None
+
+    def _ensure_primitives(self):
+        """Создаём Semaphore и Lock в контексте работающего event loop."""
+        if self._semaphore is None:
+            self._semaphore = asyncio.Semaphore(8)
+        if self._lock is None:
+            self._lock = asyncio.Lock()
 
     async def acquire(self):
+        self._ensure_primitives()
         async with self._lock:
             now = _time.monotonic()
             wait = self._interval - (now - self._last_call)
@@ -116,6 +126,7 @@ class RateLimiter:
             self._last_call = _time.monotonic()
 
     async def __aenter__(self):
+        self._ensure_primitives()
         await self._semaphore.acquire()
         await self.acquire()
         return self
@@ -459,6 +470,63 @@ def analyze_indicators(df):
     df['EMA200'] = df['close'].ewm(span=200, adjust=False).mean()
     return df
 
+
+
+# === ФУНКЦИИ ПОСТРОЕНИЯ ГРАФИКОВ ===
+
+def plot_stock(df, ticker, levels=[], patterns=[]):
+    #Построение графика акции с техническим анализом
+    if df.empty:
+        return None
+    
+    try:
+        plt.figure(figsize=(12, 6))
+        plt.plot(df.index, df['close'], label='Цена', color='blue')
+
+        plt.plot(df.index, df['EMA9'], label='EMA9', linestyle='--', alpha=0.7)
+        plt.plot(df.index, df['EMA20'], label='EMA20', linestyle='--', alpha=0.7)
+        plt.plot(df.index, df['EMA50'], label='EMA50', linestyle='--', alpha=0.7)
+        plt.plot(df.index, df['EMA100'], label='EMA100', linestyle='--', alpha=0.7)
+        plt.plot(df.index, df['EMA200'], label='EMA200', linestyle='--', alpha=0.7)
+
+        # Аномальные объемы
+        for idx in df[df['Anomaly']].index:
+            volume_ratio = df.loc[idx, 'Volume_Multiplier']
+            plt.scatter(idx, df.loc[idx, 'close'], color='red')
+            plt.text(idx, df.loc[idx, 'close'], f"{volume_ratio:.1f}x", color='red', fontsize=8, ha='left')
+
+        # Уровни поддержки/сопротивления
+        for date, price in levels:
+            plt.axhline(price, linestyle='--', alpha=0.3)
+
+        # Паттерны
+        plotted_top = False
+        plotted_bottom = False
+        for name, date, price in patterns:
+            if name == 'Double Top':
+                marker = '^'
+                color = 'red'
+                label = 'Double Top' if not plotted_top else None
+                plotted_top = True
+            else:
+                marker = 'v'
+                color = 'green'
+                label = 'Double Bottom' if not plotted_bottom else None
+                plotted_bottom = True
+            plt.scatter(date, price, label=label, s=100, marker=marker, color=color)
+
+        plt.title(f"{ticker}: График с анализом")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        filename = f"{ticker}_analysis.png"
+        plt.savefig(filename)
+        plt.close()
+        return filename
+    except Exception as e:
+        print(f"Ошибка построения графика для {ticker}: {e}")
+        plt.close()
+        return None
 
 
 # === ФУНКЦИИ ПОИСКА ПЕРЕСЕЧЕНИЙ ===
