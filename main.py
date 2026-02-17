@@ -1922,7 +1922,6 @@ if __name__ == '__main__':
     
     # === Добавляем хендлеры ===
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("chart_hv", chart_hv))
     
     # ДОЛГИЕ КОМАНДЫ — обязательно block=False
     app.add_handler(CommandHandler("cross_ema20x50", cross_ema20x50, block=False))
