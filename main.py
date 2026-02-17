@@ -1,4 +1,4 @@
-# main.py
+# main.py 
 
 import matplotlib
 matplotlib.use('Agg')  # Включаем "безголовый" режим для matplotlib
@@ -97,6 +97,28 @@ def load_figi_cache_from_file():
 figi_cache = load_figi_cache_from_file()
 
 
+# === ЗАЩИТА ОТ ДВОЙНОГО ЗАПУСКА ===
+# Telegram повторяет webhook если не получает 200 OK за 60 сек.
+# Декоратор игнорирует повторные update_id для одной команды.
+
+def no_duplicate(key: str):
+    #Декоратор: пропускает повторные вызовы с одинаковым update_id
+    def decorator(func):
+        async def wrapper(update, context, *args, **kwargs):
+            uid = update.update_id
+            running = context.bot_data.setdefault(f"_dedup_{key}", set())
+            if uid in running:
+                print(f"⚠️ [{key}] дубликат update_id={uid}, пропускаем")
+                return
+            running.add(uid)
+            try:
+                return await func(update, context, *args, **kwargs)
+            finally:
+                running.discard(uid)
+        return wrapper
+    return decorator
+
+
 # === RATE LIMITER ДЛЯ T-INVEST API ===
 # Лимиты: 120 unary запросов/мин — используем 100 с запасом
 
@@ -110,7 +132,7 @@ class RateLimiter:
         self._lock: asyncio.Lock | None = None
 
     def _ensure_primitives(self):
-        #Создаём Semaphore и Lock в контексте работающего event loop
+        """Создаём Semaphore и Lock в контексте работающего event loop."""
         if self._semaphore is None:
             self._semaphore = asyncio.Semaphore(8)
         if self._lock is None:
@@ -473,6 +495,8 @@ def analyze_indicators(df):
 
 
 
+
+
 # === ФУНКЦИИ ПОИСКА ПЕРЕСЕЧЕНИЙ ===
 
 def find_sma30_crossover(ticker, days=7):
@@ -610,7 +634,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = (
         "Привет! Это бот от команды @TradeAnsh для анализа акций Мосбиржи.\n"
-        #f"{cache_info}"
         "Команды:\n"
         "/cross_ema20x50 — акции с пересечением EMA 20x50 на 1D\n"
         "/cross_ema20x50_4h — акции с пересечением EMA 20x50 на 4H\n"
@@ -662,11 +685,8 @@ async def receive_ticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # Основные команды анализа
-async def chart_hv(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton(sector, callback_data=f"sector:{sector}:0")] for sector in SECTORS]
-    await update.message.reply_text("Выберите отрасль:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-
+@no_duplicate("high_vol")
 async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу акции с повышенным объёмом… (параллельный режим)")
     all_tickers = sum(SECTORS.values(), [])
@@ -763,6 +783,7 @@ async def high_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += "<i>Δ Потока - приток/отток денежных средств (посл. 10 дней)</i>"
     await update.message.reply_text(msg, parse_mode="HTML")
 
+@no_duplicate("ema200")
 async def cross_ema200(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения цены и EMA200 за последние 50 дней…")
     all_tickers = sum(SECTORS.values(), [])
@@ -834,6 +855,7 @@ async def cross_ema200(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(msg, parse_mode="Markdown")
 
+@no_duplicate("ema20x50")
 async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 за последние 50 дней…")
     all_tickers = sum(SECTORS.values(), [])
@@ -923,6 +945,7 @@ async def cross_ema20x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+@no_duplicate("ema9x50")
 async def cross_ema9x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу пересечения EMA9 и EMA50 за последние 50 дней…")
     all_tickers = sum(SECTORS.values(), [])
@@ -1012,15 +1035,8 @@ async def cross_ema9x50(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+@no_duplicate("cross_ema20x50_4h")
 async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Защита от двойного запуска (Telegram повторяет webhook если нет ответа за 60 сек)
-    update_id = update.update_id
-    running = context.bot_data.setdefault("running_4h", set())
-    if update_id in running:
-        print(f"⚠️ cross_ema20x50_4h: дубликат update_id={update_id}, пропускаем")
-        return
-    running.add(update_id)
-
     try:
         await update.message.reply_text("🔍 Ищу пересечения EMA20 и EMA50 по 4H таймфрейму за последние 25 свечей...")
         print("▶ Запущена команда EMA CROSS")
@@ -1131,8 +1147,6 @@ async def cross_ema20x50_4h(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except:
             print("❌ Не удалось отправить сообщение об ошибке")
-    finally:
-        running.discard(update_id)
 
 
 
@@ -1215,6 +1229,7 @@ async def process_single_ticker(ticker: str):
     except Exception as e:
         print(f"❌ Ошибка обработки тикера {ticker}: {e}")
         return None
+
 
 
 
@@ -1403,6 +1418,7 @@ async def calculate_single_delta(update: Update, context: ContextTypes.DEFAULT_T
         
 
 # RSI TOP с Стохастиком
+@no_duplicate("rsi_top")
 async def rsi_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     #Команда для показа топ перекупленных и топ перепроданных акций по RSI с добавлением Стохастика
@@ -1508,6 +1524,7 @@ def calculate_money_ad(df):
     df['money_ad'] = df['money_flow'].cumsum()
     return df
 
+@no_duplicate("moneyflow")
 async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     days = context.user_data.get("days", 10)  # по умолчанию 10
     await update.message.reply_text(f"🔍 Ищу Топ по притоку и оттоку денежного потока за {days} дней...")
@@ -1666,6 +1683,7 @@ async def long_moneyflow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Telegram команды
 
+@no_duplicate("stan_rec")
 async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30...")
     
@@ -1701,6 +1719,7 @@ async def stan_recent(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(result_text)
 
 
+@no_duplicate("stan_short")
 async def stan_recent_d_short(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу акции с недавним short пересечением цены через SMA30...")
     
@@ -1735,6 +1754,7 @@ async def stan_recent_d_short(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     await update.message.reply_text(result_text)
 
+@no_duplicate("stan_week")
 async def stan_recent_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Ищу акции с недавним long пересечением цены через SMA30… (параллельный режим)")
     all_tickers = sum(SECTORS.values(), [])
@@ -1858,6 +1878,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             df = analyze_indicators(df)
 
+            
+            if chart is None:
+                await context.bot.send_message(chat_id=query.message.chat.id, text=f"❌ Ошибка при создании графика для {ticker}")
+                return
 
             rsi_series = df['RSI'].dropna()
             rsi_value = rsi_series.iloc[-1] if not rsi_series.empty else "Недостаточно данных для RSI"
