@@ -1,5 +1,9 @@
 # main.py 
 
+import os
+
+os.environ.setdefault("SSL_TBANK_VERIFY", "True")
+
 import matplotlib
 matplotlib.use('Agg')  # Включаем "безголовый" режим для matplotlib
 import requests
